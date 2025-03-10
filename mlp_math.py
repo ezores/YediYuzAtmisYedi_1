@@ -21,13 +21,11 @@ def tanh_derivative(x):
     return 1 - np.tanh(x)**2
 
 def softmax(x):
-    x = np.array(x)
     shiftx = x - np.max(x)
     ex = np.exp(shiftx)
     return ex / np.sum(ex)
 
 def softmax_derivative(x):
-    # Note: The full Jacobian is more complex.
     s = softmax(x)
     return s * (1 - s)
 

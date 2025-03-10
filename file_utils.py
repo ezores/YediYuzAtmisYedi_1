@@ -8,7 +8,6 @@ def print_header(title):
     print(f"\n{border}\n{title}\n{border}\n")
 
 def print_matrix(label, matrix):
-    # Use numpy’s array2string for formatted printing.
     print(f"{label}:\n{np.array2string(matrix, precision=4)}\n")
 
 def clear_folder(folder):
@@ -56,7 +55,7 @@ def load_matrix(filename):
     except Exception as e:
         print(f"Error loading matrix from {filename}: {e}")
         mat = np.array([])
-    print(f"Loaded matrix from {filename} with {mat.shape[0]} rows and {mat.shape[1] if mat.ndim>1 else 0} columns.")
+    print(f"Loaded matrix from {filename} with shape: {mat.shape}")
     return mat
 
 def save_hidden_units(hidden_activations, filename="hidden_units.txt"):
@@ -66,3 +65,20 @@ def save_hidden_units(hidden_activations, filename="hidden_units.txt"):
             f.write(np.array2string(act, precision=4))
             f.write("\n\n")
     print(f"Hidden unit activations saved to: {os.path.abspath(filename)}")
+
+def split_data(samples, labels, cv_split=0.2):
+    combined = list(zip(samples, labels))
+    print(f"Combined data length: {len(combined)}")
+    import random
+    random.shuffle(combined)
+    idx = int(len(combined) * (1 - cv_split))
+    print(f"Index for split: {idx}")
+    train_data = combined[:idx]
+    val_data = combined[idx:]
+    if not train_data:
+        print("Warning: No training data after split.")
+    if not val_data:
+        print("Warning: No validation data after split.")
+    X_train, Y_train = zip(*train_data) if train_data else ([], [])
+    X_val, Y_val = zip(*val_data) if val_data else ([], [])
+    return list(X_train), list(Y_train), list(X_val), list(Y_val)

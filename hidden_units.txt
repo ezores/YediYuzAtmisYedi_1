@@ -1,0 +1,32 @@
+Hidden Layer 1 activations:
+[[0.8298]
+ [0.718 ]]
+
+Hidden Layer 2 activations:
+[[0.8298]
+ [0.718 ]]
+
+Hidden Layer 3 activations:
+[[0.8298]
+ [0.718 ]]
+
+Hidden Layer 4 activations:
+[[0.8298]
+ [0.718 ]]
+
+Hidden Layer 5 activations:
+[[0.8298]
+ [0.718 ]]
+
+Hidden Layer 6 activations:
+[[0.8298]
+ [0.718 ]]
+
+Hidden Layer 7 activations:
+[[0.8298]
+ [0.718 ]]
+
+Hidden Layer 8 activations:
+[[0.8298]
+ [0.718 ]]
+

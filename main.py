@@ -2,20 +2,18 @@
 import sys
 import os
 import numpy as np
+import configparser
 from file_utils import process_file, load_matrix, clear_pictures_folder, print_header
 from training import train_model, get_test_input_case1
 from visualization import visualize_network, generate_interactive_html
-from propagation import forward_propagation, backward_propagation, update_weights
-import configparser
 
-def read_config(config_filename="config.ini"):
+def read_config(config_filename="default_config.ini"):
     config = configparser.ConfigParser()
     if os.path.exists(config_filename):
         config.read(config_filename)
         cfg = config['DEFAULT']
         try:
             num_layers = int(cfg.get('num_layers'))
-            # Example: "2,2,1" (input, one hidden, output)
             layer_sizes = [int(x.strip()) for x in cfg.get('layer_sizes').split(',')]
             activation = cfg.get('activation')
             learning_rate = float(cfg.get('learning_rate'))
@@ -60,10 +58,10 @@ def get_user_input():
         max_time = int(input("Entrez le temps maximum d'apprentissage (en secondes): "))
         patience = int(input("Entrez le nombre de patience: "))
         cv_split = float(input("Entrez le pourcentage de validation croisée (ex: 0.2): "))
-    # Initialize weights and biases with small random numbers
+    # Initialize weights and biases
     weights = []
     biases = []
-    for i in range(len(layer_sizes)-1):
+    for i in range(len(layer_sizes) - 1):
         prev_size = layer_sizes[i]
         cur_size = layer_sizes[i+1]
         w = np.random.uniform(-0.1, 0.1, (cur_size, prev_size))
@@ -74,8 +72,8 @@ def get_user_input():
     return Y_dummy, layer_sizes, activations, weights, biases, learning_rate, max_time, patience, cv_split
 
 def main():
+    # If running in test mode, generate three data sets (40, 50, 60 segments)
     if "--test" in sys.argv:
-        # Process three datasets: 40, 50, 60 segments
         input_file = os.path.join("InputFiles", "data_train.txt")
         out_40 = os.path.join("OutputFiles", "data_train_40_ligne.txt")
         out_50 = os.path.join("OutputFiles", "data_train_50_ligne.txt")
@@ -88,15 +86,14 @@ def main():
                 print(f"SUCCESS: Processed file {f} exists.")
             else:
                 print(f"ERROR: Processed file {f} does NOT exist.")
-        # Load one set (e.g., 40 segments) and create samples
+        # Load one data set (e.g., 40 segments)
         X_mat = load_matrix(out_40)
         X_samples = [np.array(row).reshape(-1, 1) for row in X_mat]
         Y_samples = [np.zeros((X_mat.shape[1], 1)) for _ in X_samples]
-        # Visualization test using test input case 1:
+        # Visualize using a test case
         test_X, test_Y, layer_sizes_test, acts_test, w_test, b_test = get_test_input_case1()
         visualize_network(layer_sizes_test, test_X, b_test, filename="test_network_vis.png")
         generate_interactive_html(layer_sizes_test, test_X, w_test, b_test, filename="test_network.html")
-        # Training test:
         print("Running training test on test case 1...")
         s_test = [test_X] * 10
         y_test = [test_Y] * 10

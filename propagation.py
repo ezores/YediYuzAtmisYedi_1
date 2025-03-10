@@ -4,7 +4,6 @@ from mlp_math import activation_functions, hadamard_product
 from file_utils import print_header, print_matrix
 
 def forward_propagation(X, weights, biases, activations):
-    # Ensure X is a column vector (shape: (n, 1))
     X = np.atleast_2d(X)
     if X.shape[0] == 1 and X.shape[1] != 1:
         X = X.T

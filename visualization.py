@@ -4,18 +4,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def visualize_network(layer_sizes, X, biases, filename="network_vis.png", folder="pictures"):
-    """
-    Simple visualization: neurons as circles and connections as lines.
-    """
     if not os.path.exists(folder):
         os.makedirs(folder)
-    # Flatten X if necessary (assumed to be a column vector)
     if X.ndim > 1 and X.shape[1] != 1:
         X = X.flatten()
     positions = {}
     neuron_counter = 0
-    x_spacing = 2    # Horizontal spacing between layers
-    y_spacing = 1    # Vertical spacing between neurons
+    x_spacing = 2   # horizontal spacing
+    y_spacing = 1   # vertical spacing
     for layer_idx, num_neurons in enumerate(layer_sizes):
         total_height = (num_neurons - 1) * y_spacing
         for neuron_idx in range(num_neurons):
@@ -58,11 +54,11 @@ def generate_interactive_html(layer_sizes, X, weights, biases, filename="network
     colors = []
     for idx in range(len(layer_sizes)):
         if idx == 0:
-            colors.append("#4CAF50")  # input layer
+            colors.append("#4CAF50")
         elif idx == len(layer_sizes)-1:
-            colors.append("#FF5722")  # output layer
+            colors.append("#FF5722")
         else:
-            colors.append("#2196F3")  # hidden layer
+            colors.append("#2196F3")
     if X.ndim > 1 and X.shape[1] != 1:
         X = X.flatten()
     for layer_idx, size in enumerate(layer_sizes):
