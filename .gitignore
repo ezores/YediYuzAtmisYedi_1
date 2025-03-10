@@ -169,3 +169,25 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+my_env/bin/f2py
+my_env/bin/fonttools
+my_env/bin/isympy
+my_env/bin/numpy-config
+my_env/bin/pip
+my_env/bin/pip3
+my_env/bin/pip3.12
+my_env/bin/pyftmerge
+my_env/bin/pyftsubset
+my_env/bin/python
+my_env/bin/python3
+my_env/bin/python3.12
+my_env/bin/ttx
+my_env/share/man/man1/isympy.1
+my_env/share/man/man1/ttx.1
+pictures/network_vis_manual.png
+my_env/pyvenv.cfg
+my_env/bin/activate
+my_env/bin/activate.csh
+my_env/bin/activate.fish
+my_env/bin/Activate.ps1
+html/network_manual.html
