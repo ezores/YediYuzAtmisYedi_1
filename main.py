@@ -1,124 +1,220 @@
-# main.py
-import sys
 import os
-import numpy as np
+import sys
+import argparse
 import configparser
-from file_utils import process_file, load_matrix, clear_pictures_folder, print_header
-from training import train_model, get_test_input_case1
-from visualization import visualize_network, generate_interactive_html
+import numpy as np
+from file_utils import process_file, getES, split_data, DEFAULT_OUTPUT_ENCODING
+from mlp import MLP
 
-def read_config(config_filename="default_config.ini"):
+# Configuration defaults
+DEFAULT_CONFIG = {
+    'eta': '0.1',
+    'nb_epoches': '100',
+    'neurones_par_couche_cachee': '50',
+    'fct': 'sigmoid',
+    'base_donnees': '40',
+    'adaptive_eta': 'False',
+    'noise_sigma': '0.0',
+    'momentum': '0.0'
+}
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="MLP Speech Recognition System")
+    
+    # Mode selection
+    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group.add_argument('--train', action='store_true', help='Training mode')
+    mode_group.add_argument('--vc', action='store_true', help='Validation cross-check mode')
+    mode_group.add_argument('--test', action='store_true', help='Testing mode')
+
+    # Training parameters
+    parser.add_argument('--eta', type=float, help='Learning rate')
+    parser.add_argument('--neurons', nargs='+', type=int, help='Number of neurons per hidden layer')
+    parser.add_argument('--activations', nargs='+', help='Activation functions for hidden layers')
+    parser.add_argument('--base', type=int, choices=[40,50,60], help='Database size (40, 50, 60)')
+    parser.add_argument('--epochs', type=int, help='Number of training epochs')
+    parser.add_argument('--adaptive', action='store_true', help='Use adaptive learning rate')
+    parser.add_argument('--noise', type=float, help='Add Gaussian noise with specified sigma')
+
+    return parser.parse_args()
+
+def interactive_config(args):
+    """Enhanced interactive configuration with validation"""
+    print("\n=== Configuration Interactive ===")
+    
+    # Set defaults for missing attributes
+    args.adaptive = getattr(args, 'adaptive', False)
+    args.noise = getattr(args, 'noise', 0.0)
+    
+    # Learning rate
+    if args.eta is None:
+        args.eta = float(input(f"Learning rate [{DEFAULT_CONFIG['eta']}]: ") or DEFAULT_CONFIG['eta'])
+    
+    # Hidden layer neurons
+    if not args.neurons:
+        default_neurons = DEFAULT_CONFIG['neurones_par_couche_cachee']
+        args.neurons = list(map(int, input(f"Hidden layer neurons (comma-sep) [{default_neurons}]: ").split(',')))
+
+    # Activation functions
+    if not args.activations:
+        from mlp_math import activation_functions
+        print(f"Available activations: {', '.join(activation_functions.keys())}")
+        args.activations = [input(f"Activation function [{DEFAULT_CONFIG['fct']}]: ") or DEFAULT_CONFIG['fct']]
+
+    # Database size
+    if args.base is None:
+        args.base = int(input(f"Database size (40/50/60) [{DEFAULT_CONFIG['base_donnees']}]: ") or DEFAULT_CONFIG['base_donnees'])
+
+    # Training epochs
+    if args.epochs is None:
+        args.epochs = int(input(f"Training epochs [{DEFAULT_CONFIG['nb_epoches']}]: ") or DEFAULT_CONFIG['nb_epoches'])
+
+    # Adaptive learning rate
+    if not args.adaptive:
+        args.adaptive = input("Use adaptive learning rate? (y/n) [n]: ").lower() == 'y'
+
+    # Gaussian noise
+    if args.noise is None:
+        args.noise = float(input("Add Gaussian noise (sigma, 0 for none) [0]: ") or 0)
+
+    return args
+
+def load_or_create_config(args):
+    """Config manager with validation"""
     config = configparser.ConfigParser()
-    if os.path.exists(config_filename):
-        config.read(config_filename)
-        cfg = config['DEFAULT']
-        try:
-            num_layers = int(cfg.get('num_layers'))
-            layer_sizes = [int(x.strip()) for x in cfg.get('layer_sizes').split(',')]
-            activation = cfg.get('activation')
-            learning_rate = float(cfg.get('learning_rate'))
-            max_time = int(cfg.get('max_time'))
-            patience = int(cfg.get('patience'))
-            cv_split = float(cfg.get('cv_split'))
-            return {
-                'num_layers': num_layers,
-                'layer_sizes': layer_sizes,
-                'activation': activation,
-                'learning_rate': learning_rate,
-                'max_time': max_time,
-                'patience': patience,
-                'cv_split': cv_split
-            }
-        except Exception as e:
-            print("Error reading configuration:", e)
+    
+    if os.path.exists('config.ini'):
+        config.read('config.ini')
     else:
-        print("No configuration file found.")
-    return None
+        config['DEFAULT'] = DEFAULT_CONFIG
+    
+    # Update with command-line arguments
+    config['DEFAULT']['eta'] = str(args.eta)
+    config['DEFAULT']['neurones_par_couche_cachee'] = ','.join(map(str, args.neurons))
+    config['DEFAULT']['fct'] = args.activations[0]
+    config['DEFAULT']['base_donnees'] = str(args.base)
+    config['DEFAULT']['nb_epoches'] = str(args.epochs)
+    config['DEFAULT']['adaptive_eta'] = str(args.adaptive)
+    config['DEFAULT']['noise_sigma'] = str(args.noise)
+    
+    # Write config
+    with open('config.ini', 'w') as configfile:
+        config.write(configfile)
+    
+    return config
 
-def get_user_input():
-    config = read_config()
-    if config:
-        print("Loaded configuration:")
-        print(config)
-        layer_sizes = config['layer_sizes']
-        num_layers = config['num_layers']
-        activations = [config['activation']] * (num_layers - 1)
-        learning_rate = config['learning_rate']
-        max_time = config['max_time']
-        patience = config['patience']
-        cv_split = config['cv_split']
-    else:
-        num_layers = int(input("Entrez le nombre total de couches (entrée, cachées, sortie) : "))
-        layer_sizes = []
-        act = input("Entrez la fonction d'activation (sigmoide/tan/tanh/softmax/personnalisée/sinus) : ").strip()
-        for i in range(num_layers):
-            layer_sizes.append(int(input(f"Entrez le nombre de neurones dans la couche {i+1} : ")))
-        activations = [act] * (num_layers - 1)
-        learning_rate = float(input("Entrez le taux d'apprentissage: "))
-        max_time = int(input("Entrez le temps maximum d'apprentissage (en secondes): "))
-        patience = int(input("Entrez le nombre de patience: "))
-        cv_split = float(input("Entrez le pourcentage de validation croisée (ex: 0.2): "))
-    # Initialize weights and biases
-    weights = []
-    biases = []
-    for i in range(len(layer_sizes) - 1):
-        prev_size = layer_sizes[i]
-        cur_size = layer_sizes[i+1]
-        w = np.random.uniform(-0.1, 0.1, (cur_size, prev_size))
-        b = np.zeros((cur_size, 1))
-        weights.append(w)
-        biases.append(b)
-    Y_dummy = np.zeros((layer_sizes[-1], 1))
-    return Y_dummy, layer_sizes, activations, weights, biases, learning_rate, max_time, patience, cv_split
+def prepare_datasets(base_size: int) -> str:
+    input_path = os.path.join("InputFiles", "data_train.txt")
+    output_path = os.path.join("OutputFiles", f"data_train_{base_size}_ligne.txt")
+    
+    if not os.path.exists(output_path):
+        print("\n=== Starting Data Processing ===")
+        # Add parameter validation for space-separated input
+        process_file(input_path, output_path, 
+                    elements_per_segment=26,
+                    selected_elements=12,
+                    total_segments=base_size)
+    
+    return output_path  # Return path to PROCESSED file
 
 def main():
-    # If running in test mode, generate three data sets (40, 50, 60 segments)
-    if "--test" in sys.argv:
-        input_file = os.path.join("InputFiles", "data_train.txt")
-        out_40 = os.path.join("OutputFiles", "data_train_40_ligne.txt")
-        out_50 = os.path.join("OutputFiles", "data_train_50_ligne.txt")
-        out_60 = os.path.join("OutputFiles", "data_train_60_ligne.txt")
-        process_file(input_file, out_40, total_segments=40)
-        process_file(input_file, out_50, total_segments=50)
-        process_file(input_file, out_60, total_segments=60)
-        for f in [out_40, out_50, out_60]:
-            if os.path.exists(f):
-                print(f"SUCCESS: Processed file {f} exists.")
-            else:
-                print(f"ERROR: Processed file {f} does NOT exist.")
-        # Load one data set (e.g., 40 segments)
-        X_mat = load_matrix(out_40)
-        X_samples = [np.array(row).reshape(-1, 1) for row in X_mat]
-        Y_samples = [np.zeros((X_mat.shape[1], 1)) for _ in X_samples]
-        # Visualize using a test case
-        test_X, test_Y, layer_sizes_test, acts_test, w_test, b_test = get_test_input_case1()
-        visualize_network(layer_sizes_test, test_X, b_test, filename="test_network_vis.png")
-        generate_interactive_html(layer_sizes_test, test_X, w_test, b_test, filename="test_network.html")
-        print("Running training test on test case 1...")
-        s_test = [test_X] * 10
-        y_test = [test_Y] * 10
-        train_model(s_test, y_test, w_test, b_test, acts_test, 0.1, max_time=10, patience=3, cv_split=0.2)
-    else:
-        out_40 = os.path.join("OutputFiles", "data_train_40_ligne.txt")
-        if os.path.exists(out_40):
-            X_mat = load_matrix(out_40)
-            X_samples = [np.array(row).reshape(-1, 1) for row in X_mat]
-            Y_samples = [np.zeros((X_mat.shape[1], 1)) for _ in X_samples]
-            big_input_sample = X_samples[0]
-        else:
-            print("No processed file found, using test case 1 as fallback.")
-            test_X, test_Y, layer_sizes_test, acts_test, w_test, b_test = get_test_input_case1()
-            X_samples = [test_X]
-            Y_samples = [test_Y]
-            big_input_sample = test_X
-        Y_dummy, layer_sizes, activations, weights, biases, learning_rate, max_time, patience, cv_split = get_user_input()
-        clear_pictures_folder()
-        print("Layer sizes:", layer_sizes)
-        print("Activations:", activations)
-        print_header("Visualisation du Réseau (Manual)")
-        visualize_network(layer_sizes, big_input_sample, biases, filename="network_vis_manual.png")
-        generate_interactive_html(layer_sizes, big_input_sample, weights, biases, filename="network_manual.html")
-        trained_weights, trained_biases = train_model(X_samples, Y_samples, weights, biases, activations,
-                                                      learning_rate, max_time, patience, cv_split)
+    # Parse and validate arguments
+    args = parse_arguments()
+    args = interactive_config(args)
+    config = load_or_create_config(args)
+    
+    try:
+        # Prepare dataset
+        data_file = prepare_datasets(args.base)
+        print(f"Loading processed file: {data_file}")  # Add this debug line
+        
+        # Pre-validate data file
+        print("\n=== Input File Validation ===")
+        with open(data_file, 'r') as f:
+            for _ in range(3):
+                line = f.readline().strip()
+                if not line:
+                    continue
+                if ':' not in line:
+                    print(f"Validation Error: Missing colon in sample line: '{line[:50]}...'")
+                else:
+                    identifier, values = line.split(':', 1)
+                    print(f"Sample Line OK - ID: {identifier}, Values: {len(values.split())} features")
+                    
+        # Load data with enhanced validation
+        X, Y = getES(data_file, DEFAULT_OUTPUT_ENCODING)
+        
+        # Verify dataset integrity
+        if X.size == 0 or Y.size == 0:
+            raise ValueError("Empty dataset loaded")
+
+    except Exception as e:
+        print(f"\nCritical error: {e}")
+        print("Possible solutions:")
+        print("1. Verify input files exist in InputFiles/ directory")
+        print("2. Check data files use format: 'ID: val1 val2 ...'")
+        print("3. Ensure numeric values after colon separator")
+        print("4. Confirm identifiers are digits 0-9")
+        sys.exit(1)
+
+    # Split data based on mode
+    if args.train:
+        X_train, Y_train, X_val, Y_val = split_data(X, Y, cv_split=0.2)
+    elif args.vc:
+        X_train, Y_train, X_val, Y_val = split_data(X, Y, cv_split=0.5)
+    else:  # test mode
+        X_train, Y_train, X_val, Y_val = X, Y, np.array([]), np.array([])
+
+    # Initialize MLP
+    mlp = MLP(
+        input_size=X.shape[1],
+        hidden_sizes=args.neurons,
+        output_size=10,
+        activation=args.activations[0],
+        learning_rate=args.eta,
+        max_epochs=args.epochs,
+        adaptive_eta=args.adaptive,
+        noise_sigma=args.noise
+    )
+
+    # Training process
+    if args.train or args.vc:
+        print("\n=== Starting Training ===")
+        try:
+            mlp.train(X_train, Y_train, X_val, Y_val)
+            
+            # Save hidden units
+            mlp.save_hidden_units(X_train)
+            
+            # Final evaluation
+            if args.train:
+                print("\n=== Training Performance ===")
+                train_acc = mlp.evaluate(X_train, Y_train)
+                print(f"Training Accuracy: {train_acc:.2%}")
+                
+                print("\n=== Validation Performance ===")
+                val_acc = mlp.evaluate(X_val, Y_val)
+                print(f"Validation Accuracy: {val_acc:.2%}")
+            
+            if args.vc:
+                print("\n=== Cross-Validation Results ===")
+                vc_acc = mlp.evaluate(X_val, Y_val)
+                print(f"Cross-Validation Accuracy: {vc_acc:.2%}")
+
+        except Exception as e:
+            print(f"\nTraining failed: {str(e)}")
+            sys.exit(1)
+
+    if args.test:
+        print("\n=== Testing Mode ===")
+        try:
+            test_file = os.path.join("InputFiles", "data_test.txt")
+            X_test, Y_test = getES(test_file, DEFAULT_OUTPUT_ENCODING)
+            test_acc = mlp.evaluate(X_test, Y_test)
+            print(f"Test Accuracy: {test_acc:.2%}")
+        except Exception as e:
+            print(f"\nTesting failed: {str(e)}")
+            sys.exit(1)
+
 if __name__ == "__main__":
     main()

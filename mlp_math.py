@@ -1,54 +1,42 @@
-# mlp_math.py
 import numpy as np
 
-def sigmoid(x):
-    return 1.0 / (1.0 + np.exp(-x))
+# Enhanced activation functions with numerical stability
+def sigmoid(z, derive=False):
+    z = np.clip(z, -500, 500)  # Prevent overflow
+    s = 1 / (1 + np.exp(-z))
+    return s * (1 - s) if derive else s
 
-def sigmoid_derivative(x):
-    s = sigmoid(x)
-    return s * (1 - s)
+def relu(z, derive=False):
+    return np.where(z > 0, 1, 0) if derive else np.maximum(0, z)
 
-def tan(x):
-    return np.tan(x)
+def leaky_relu(z, alpha=0.01, derive=False):
+    if derive:
+        return np.where(z > 0, 1, alpha)
+    return np.where(z > 0, z, alpha * z)
 
-def tan_derivative(x):
-    return 1.0 / np.cos(x)**2
+def tanh(z, derive=False):
+    t = np.tanh(z)
+    return 1 - t**2 if derive else t
 
-def tanh(x):
-    return np.tanh(x)
-
-def tanh_derivative(x):
-    return 1 - np.tanh(x)**2
-
-def softmax(x):
-    shiftx = x - np.max(x)
-    ex = np.exp(shiftx)
-    return ex / np.sum(ex)
-
-def softmax_derivative(x):
-    s = softmax(x)
-    return s * (1 - s)
-
-def custom_activation(x):
-    return x
-
-def custom_activation_derivative(x):
-    return np.ones_like(x)
-
-def sinus(x):
-    return np.sin(x)
-
-def sinus_derivative(x):
-    return np.cos(x)
+def softmax(z, derive=False):
+    e_z = np.exp(z - np.max(z))  # Numerical stability
+    sm = e_z / e_z.sum(axis=0)
+    if derive:
+        return sm * (1 - sm)  # Simplified derivative for cross-entropy
+    return sm
 
 activation_functions = {
-    'sigmoide': (sigmoid, sigmoid_derivative),
-    'tanh': (tanh, tanh_derivative),
-    'tan': (tan, tan_derivative),
-    'softmax': (softmax, softmax_derivative),
-    'personnalisée': (custom_activation, custom_activation_derivative),
-    'sinus': (sinus, sinus_derivative)
+    'sigmoid': (sigmoid, sigmoid),
+    'relu': (relu, relu),
+    'leakyrelu': (leaky_relu, leaky_relu),
+    'tanh': (tanh, tanh),
+    'softmax': (softmax, softmax)
 }
 
-def hadamard_product(A, B):
-    return A * B
+def hadamard_product(a, b):
+    """Element-wise product with broadcasting support"""
+    return a * b
+
+def l2_regularization(weights, lambda_=0.01):
+    """Calculate L2 regularization term"""
+    return 0.5 * lambda_ * sum(np.sum(w**2) for w in weights)

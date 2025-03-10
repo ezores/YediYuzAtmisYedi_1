@@ -1,0 +1,12 @@
+# MLP Configuration File
+# This file stores the last used network configuration and parameters.
+# Modify the values below to experiment with the MLP.
+
+dataset_frames = 40          # Number of frames per input sample (choose 40, 50, or 60 as per dataset)
+hidden_layers = [50]         # List specifying neurons in each hidden layer (e.g., [50, 20] for two hidden layers of sizes 50 and 20)
+activation_function = sigmoid  # Activation function for all neurons (options: sigmoid, tanh, sin)
+epochs = 15                  # Maximum number of training epochs 
+learning_rate = 0.1          # Initial learning rate for gradient descent
+adaptive_learning = False    # Whether to use adaptive learning rate (linearly decreases to 0 over epochs)
+noise_augmentation = False   # Whether to augment training data with noise (adds a noisy copy of each training sample)
+noise_std = 0.1              # Standard deviation of noise to add (used only if noise_augmentation is True)
