@@ -33,6 +33,7 @@ class MLP:
         self.adaptive_eta = adaptive_eta
         self.noise_sigma = noise_sigma
         self.momentum = momentum
+        self.use_batch_norm = True # suggestion
         
         # Initialize network parameters
         self.weights, self.biases = self._initialize_parameters()
@@ -40,22 +41,36 @@ class MLP:
         self.best_biases = None
         self.training_history = None
 
+    # def _initialize_parameters(self):
+    #     """Initialize weights with He initialization and biases to zero"""
+    #     layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
+    #     weights = []
+    #     biases = []
+    #
+    #     for i in range(len(layer_sizes)-1):
+    #         # He initialization for ReLU variants, sqrt(2/n) for others
+    #         if self.activation in ['relu', 'leakyrelu']:
+    #             std = np.sqrt(2.0 / layer_sizes[i])
+    #         else:
+    #             std = np.sqrt(1.0 / layer_sizes[i])
+    #
+    #         weights.append(np.random.randn(layer_sizes[i+1], layer_sizes[i]) * std)
+    #         biases.append(np.zeros((layer_sizes[i+1], 1)))
+    #
+    #     return weights, biases
     def _initialize_parameters(self):
-        """Initialize weights with He initialization and biases to zero"""
         layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
         weights = []
         biases = []
-        
-        for i in range(len(layer_sizes)-1):
-            # He initialization for ReLU variants, sqrt(2/n) for others
-            if self.activation in ['relu', 'leakyrelu']:
+
+        for i in range(len(layer_sizes) - 1):
+            if self.activation.lower() in ['relu', 'leakyrelu']:
                 std = np.sqrt(2.0 / layer_sizes[i])
             else:
-                std = np.sqrt(1.0 / layer_sizes[i])
-                
-            weights.append(np.random.randn(layer_sizes[i+1], layer_sizes[i]) * std)
-            biases.append(np.zeros((layer_sizes[i+1], 1)))
-            
+                std = np.sqrt(1.0 / layer_sizes[i])  # Simplification
+            weights.append(np.random.randn(layer_sizes[i + 1], layer_sizes[i]) * std)
+            biases.append(np.zeros((layer_sizes[i + 1], 1)))
+
         return weights, biases
 
     def train(self, X_train, Y_train, X_val=None, Y_val=None):
@@ -99,12 +114,21 @@ class MLP:
         
         return history
 
+    # def predict(self, X):
+    #     """Make predictions for input samples"""
+    #     X = np.array(X).T  # Convert to column vectors
+    #     activations, _ = forward_propagation(X, self.weights, self.biases,
+    #                                        [self.activation]*len(self.hidden_sizes) + ['sigmoid'])
+    #     return activations[-1].T  # Return as row vectors
     def predict(self, X):
-        """Make predictions for input samples"""
         X = np.array(X).T  # Convert to column vectors
-        activations, _ = forward_propagation(X, self.weights, self.biases, 
-                                           [self.activation]*len(self.hidden_sizes) + ['sigmoid'])
-        return activations[-1].T  # Return as row vectors
+        activations, _, _ = forward_propagation(  # Add third unpacking
+            X,
+            self.weights,
+            self.biases,
+            [self.activation] * len(self.hidden_sizes) + ['sigmoid']
+        )
+        return activations[-1].T
 
     def evaluate(self, X, Y):
         """Calculate accuracy for given samples and labels"""
@@ -113,21 +137,34 @@ class MLP:
         y_pred = np.argmax(predictions, axis=1)
         return np.mean(y_pred == y_true)
 
+    # def save_hidden_units(self, X):
+    #     """Save activations of all hidden layers for given input"""
+    #     X = np.array(X).T  # Convert to column vectors
+    #     activations, _ = forward_propagation(X, self.weights, self.biases,
+    #                                        [self.activation]*len(self.hidden_sizes) + ['sigmoid'])
+    #
+    #     # Extract hidden layer activations (exclude input and output)
+    #     hidden_activations = activations[1:-1]
+    #
+    #     # Format and save activations
+    #     formatted_activations = []
+    #     for layer_idx, layer_acts in enumerate(hidden_activations):
+    #         # Transpose to get samples as rows, neurons as columns
+    #         formatted_activations.append(layer_acts.T)
+    #
+    #     save_hidden_units(formatted_activations)
     def save_hidden_units(self, X):
-        """Save activations of all hidden layers for given input"""
-        X = np.array(X).T  # Convert to column vectors
-        activations, _ = forward_propagation(X, self.weights, self.biases,
-                                           [self.activation]*len(self.hidden_sizes) + ['sigmoid'])
-        
-        # Extract hidden layer activations (exclude input and output)
+        X = np.array(X).T
+        activations, _, _ = forward_propagation(  # Add third unpacking
+            X,
+            self.weights,
+            self.biases,
+            [self.activation] * len(self.hidden_sizes) + ['sigmoid']
+        )
+
         hidden_activations = activations[1:-1]
-        
-        # Format and save activations
-        formatted_activations = []
-        for layer_idx, layer_acts in enumerate(hidden_activations):
-            # Transpose to get samples as rows, neurons as columns
-            formatted_activations.append(layer_acts.T)
-            
+        formatted_activations = [layer_acts.T for layer_acts in hidden_activations]
+
         save_hidden_units(formatted_activations)
         
     def get_architecture(self):

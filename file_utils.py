@@ -1,193 +1,106 @@
 import os
-import shutil
 import numpy as np
 from typing import List, Tuple, Dict, Union
 
-# Constants
-DEFAULT_OUTPUT_ENCODING = {
-    '0': [1,0,0,0,0,0,0,0,0,0],
-    '1': [0,1,0,0,0,0,0,0,0,0],
-    '2': [0,0,1,0,0,0,0,0,0,0],
-    '3': [0,0,0,1,0,0,0,0,0,0],
-    '4': [0,0,0,0,1,0,0,0,0,0],
-    '5': [0,0,0,0,0,1,0,0,0,0],
-    '6': [0,0,0,0,0,0,1,0,0,0],
-    '7': [0,0,0,0,0,0,0,1,0,0],
-    '8': [0,0,0,0,0,0,0,0,1,0],
-    '9': [0,0,0,0,0,0,0,0,0,1]
-}
+DEFAULT_OUTPUT_ENCODING = {str(i): [1 if j == i else 0 for j in range(10)] for i in range(10)}
 
-VALID_IDS = set(DEFAULT_OUTPUT_ENCODING.keys())
 
-def process_file(input_file: str, output_file: str, 
-                elements_per_segment: int = 26, 
-                selected_elements: int = 12,
-                total_segments: int = 40) -> None:
-    """
-    Processes colon-separated input files with ID normalization
-    """
-    VALID_IDS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-    
-    print("\n=== Raw Input Validation ===")
+def process_file(input_file, output_file, elements_per_segment=26, selected_elements=12, total_segments=40):
+    all_values = []
+    VALID_IDS = set(DEFAULT_OUTPUT_ENCODING.keys())
+
+    # Première passe : collecter toutes les valeurs
     with open(input_file, 'r') as f:
-        sample_lines = [next(f).strip() for _ in range(5)]
-    
-    for idx, line in enumerate(sample_lines, 1):
-        if ':' not in line:
-            print(f"INVALID LINE {idx}: '{line[:50]}...'")
-        else:
-            print(f"VALID LINE {idx}: '{line[:50]}...'")
-
-    error_report = {
-        'total_lines': 0,
-        'empty_lines': 0,
-        'missing_colon': 0,
-        'invalid_id': 0,
-        'value_error': 0,
-        'insufficient_values': 0,
-        'segment_errors': 0,
-        'successful': 0
-    }
-
-    processed_lines = []
-    
-    with open(input_file, 'r') as infile:
-        for line_num, line in enumerate(infile, 1):
-            error_report['total_lines'] += 1
-            line = line.strip()
-            
-            if not line:
-                error_report['empty_lines'] += 1
-                continue
-
-            # Split on colon
+        for line in f:
             if ':' not in line:
-                error_report['missing_colon'] += 1
-                print(f"[Line {line_num}] Missing colon: '{line[:50]}...'")
                 continue
-
-            parts = line.split(':', 1)
-            identifier = parts[0].strip().lower().replace('o', '0').replace(':', '')
-            values_str = parts[1].strip()
-
-            # Validate identifier
-            if not identifier.isdigit() or identifier not in VALID_IDS:
-                error_report['invalid_id'] += 1
-                print(f"[Line {line_num}] Invalid ID '{identifier}': '{line[:50]}...'")
-                continue
-
-            # Convert values to floats
+            values_str = line.split(':', 1)[1].strip()
             try:
-                values = [float(x) for x in values_str.split()]
-            except ValueError as e:
-                error_report['value_error'] += 1
-                print(f"[Line {line_num}] Value error: {e} in '{values_str[:50]}...'")
+                values = list(map(float, values_str.split()))
+                all_values.extend(values)
+            except:
                 continue
 
-            # Check total values
-            required_values = total_segments * elements_per_segment
-            if len(values) < required_values:
-                error_report['insufficient_values'] += 1
-                print(f"[Line {line_num}] Insufficient values ({len(values)} < {required_values})")
+    # Calcul des statistiques globales
+    global_mean = np.mean(all_values)
+    global_std = np.std(all_values) + 1e-8
+    #values = (values - global_mean) / (global_std + 1e-8)
+
+    # Deuxième passe : traitement avec normalisation globale
+    processed_lines = []
+    with open(input_file, 'r') as f:
+        for line in f:
+            parts = line.strip().split(':', 1)
+            if len(parts) != 2:
+                continue
+            identifier, values_str = parts
+            identifier = identifier.strip().lower().replace('o', '0')
+
+            if identifier not in VALID_IDS:
                 continue
 
-            # Extract features
-            extracted = []
             try:
+                values = (np.array(list(map(float, values_str.split()))) - global_mean) / global_std
+                extracted = []
                 for i in range(total_segments):
                     start = i * elements_per_segment
                     end = start + selected_elements
-                    segment = values[start:end]
-                    
-                    if len(segment) != selected_elements:
-                        raise ValueError(f"Segment {i} length {len(segment)} != {selected_elements}")
-                        
-                    extracted.extend(segment)
-            except (IndexError, ValueError) as e:
-                error_report['segment_errors'] += 1
-                print(f"[Line {line_num}] Segment error: {str(e)}")
+                    #extracted.extend(values[start:end])
+                    extracted.extend(values[start:end].tolist())  # Conversion explicite pour éviter les erreurs de type
+                #processed_lines.append(f"{identifier}: {' '.join(map('{:.6f}'.format, extracted))}")
+                    # Formatage corrigé avec des flottants Python
+                formatted_values = [f"{v:.6f}" for v in extracted]
+                processed_line = f"{identifier}: {' '.join(formatted_values)}"
+                processed_lines.append(processed_line)
+            except:
                 continue
 
-            # Format output line
-            formatted_values = [f"{v:.4f}" for v in extracted]
-            processed_line = f"{identifier}: {' '.join(formatted_values)}"
-            processed_lines.append(processed_line)
-            error_report['successful'] += 1
-
-    # Save output
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    with open(output_file, 'w') as outfile:
-        outfile.write("\n".join(processed_lines))
-
-    print("\n=== Data Processing Report ===")
-    print(f"Total lines processed: {error_report['total_lines']}")
-    print(f"Successfully converted: {error_report['successful']}")
-    print(f"Empty lines: {error_report['empty_lines']}")
-    print(f"Missing colons: {error_report['missing_colon']}")
-    print(f"Invalid IDs: {error_report['invalid_id']}")
-    print(f"Value errors: {error_report['value_error']}")
-    print(f"Insufficient values: {error_report['insufficient_values']}")
-    print(f"Segment errors: {error_report['segment_errors']}")
-
-    if error_report['successful'] == 0:
-        raise ValueError("No valid data processed - check input format")
+    with open(output_file, 'w') as f:
+        f.write("\n".join(processed_lines))
 
 
-def getES(filename: str, output_encoding: Dict[str, List[float]]) -> Tuple[np.ndarray, np.ndarray]:
+def getES(filename, output_encoding):
     """
-    Loads processed files with ID normalization
+    Enhanced data loading with:
+    - Additional sanity checks
+    - Automatic value casting
     """
-    VALID_IDS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
     samples = []
     labels = []
-    error_count = 0
-    max_errors_to_show = 10
 
     with open(filename, 'r') as f:
-        for line_num, line in enumerate(f, 1):
+        for line in f:
             line = line.strip()
-            if not line:
-                continue
-
-            # Split using colon
-            if ':' not in line:
-                if error_count < max_errors_to_show:
-                    print(f"[Line {line_num}] Missing colon: '{line[:50]}...'")
-                error_count += 1
+            if not line or ':' not in line:
                 continue
 
             parts = line.split(':', 1)
-            identifier = parts[0].strip().lower().replace('o', '0').replace(':', '')
+            identifier = parts[0].strip().lower().replace('o', '0')
             values_str = parts[1].strip()
 
-            if not identifier.isdigit() or identifier not in VALID_IDS:
-                if error_count < max_errors_to_show:
-                    print(f"[Line {line_num}] Invalid ID '{identifier}': '{line[:50]}...'")
-                error_count += 1
+            if identifier not in output_encoding:
                 continue
 
             try:
-                values = [float(x) for x in values_str.split()]
-            except ValueError as e:
-                if error_count < max_errors_to_show:
-                    print(f"[Line {line_num}] Value error: {e} in '{values_str[:50]}...'")
-                error_count += 1
+                # Load and verify values
+                values = np.array([float(x) for x in values_str.split()],
+                                  dtype=np.float32)
+                if len(values) == 0:
+                    continue
+
+                samples.append(values)
+                labels.append(output_encoding[identifier])
+            except ValueError:
                 continue
 
-            samples.append(values)
-            labels.append(output_encoding[identifier])
+    # Final dataset validation
+    if len(samples) == 0:
+        raise ValueError("No valid samples loaded")
 
-    if error_count > 0:
-        print(f"\nEncountered {error_count} errors during loading")
-        if error_count > max_errors_to_show:
-            print(f"Showing first {max_errors_to_show} errors...")
+    return np.array(samples), np.array(labels)
 
-    if not samples:
-        raise ValueError("No valid samples loaded - check file format")
-
-    return np.array(samples, dtype=np.float32), np.array(labels, dtype=np.float32)
-
-def split_data(samples: np.ndarray, labels: np.ndarray, 
+def split_data(samples: np.ndarray, labels: np.ndarray,
               cv_split: float = 0.2) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Splits dataset into training and validation sets with shuffling
