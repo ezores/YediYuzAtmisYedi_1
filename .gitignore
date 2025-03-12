@@ -200,3 +200,4 @@ hidden_units.txt
 OutputFiles/data_train_40_ligne.txt
 OutputFiles/data_train_50_ligne.txt
 OutputFiles/data_train_60_ligne.txt
+Visualisation_MLP.html
