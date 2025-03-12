@@ -40,8 +40,8 @@ def train_model(
     velocities = [np.zeros_like(w) for w in weights]
 
     # Formatage des données
-    # X_train, Y_train = X_train.T, Y_train.T
-    X_train, Y_train = X_train, Y_train  # No transpose
+    X_train, Y_train = X_train.T, Y_train.T
+    # X_train, Y_train = X_train, Y_train  # No transpose
     X_val = X_val.T if X_val.size > 0 else X_val
 
     for epoch in range(max_epochs):
@@ -49,8 +49,22 @@ def train_model(
         X_noisy = add_noise(X_train, noise_sigma)
 
         # Forward propagation
+        # a_cache, z_cache, bn_cache = forward_propagation(
+        #     X_noisy, weights, biases, activations, training=True
+        # )
+        # a_cache, z_cache, bn_cache = forward_propagation(
+        #     X_noisy.T,  # Transpose input to (input_size, num_samples)
+        #     weights,
+        #     biases,
+        #     activations,
+        #     training=True
+        # )
         a_cache, z_cache, bn_cache = forward_propagation(
-            X_noisy, weights, biases, activations, training=True
+            X_noisy,  # ✅ Keep data as (input_size, num_samples)
+            weights,
+            biases,
+            activations,
+            training=True
         )
 
         # Calcul de la perte avec L2
