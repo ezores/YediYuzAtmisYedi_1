@@ -1,3 +1,4 @@
+# training.py
 import time
 import numpy as np
 from propagation import forward_propagation, backward_propagation, update_weights
@@ -30,7 +31,8 @@ def add_noise(X, sigma):
 def train_model(
     X_train, Y_train, X_val, Y_val, weights, biases, activations,
     learning_rate=0.001, max_epochs=100, patience=5, noise_sigma=0.1,
-    momentum=0.9, adaptive_eta=True, lambda_l2=0.001, verbose=True
+    momentum=0.9, adaptive_eta=True, lambda_l2=0.001, verbose=True,
+    bn_params=None, use_batch_norm=False, dropout_rate=0.0
 ):
     progress = TrainingProgress(max_epochs)
     best_weights = [w.copy() for w in weights]
@@ -39,68 +41,73 @@ def train_model(
     current_lr = learning_rate
     velocities = [np.zeros_like(w) for w in weights]
 
-    # Formatage des données
+    # Format data matrices
     X_train, Y_train = X_train.T, Y_train.T
-    # X_train, Y_train = X_train, Y_train  # No transpose
     X_val = X_val.T if X_val.size > 0 else X_val
 
     for epoch in range(max_epochs):
         epoch_start = time.time()
         X_noisy = add_noise(X_train, noise_sigma)
 
-        # Forward propagation
-        # a_cache, z_cache, bn_cache = forward_propagation(
-        #     X_noisy, weights, biases, activations, training=True
-        # )
-        # a_cache, z_cache, bn_cache = forward_propagation(
-        #     X_noisy.T,  # Transpose input to (input_size, num_samples)
-        #     weights,
-        #     biases,
-        #     activations,
-        #     training=True
-        # )
-        a_cache, z_cache, bn_cache = forward_propagation(
-            X_noisy,  # ✅ Keep data as (input_size, num_samples)
+        # Forward propagation with BN and dropout
+        a_cache, z_cache, cache = forward_propagation(
+            X_noisy,
             weights,
             biases,
             activations,
-            training=True
+            bn_params=bn_params,
+            training=True,
+            dropout_rate=dropout_rate
         )
 
-        # Calcul de la perte avec L2
+        # Calculate loss with L2 regularization
         train_ce = cross_entropy_loss(a_cache[-1], Y_train)
         l2_term = 0.5 * lambda_l2 * sum(np.sum(w**2) for w in weights)
         train_loss = train_ce + l2_term
 
         # Backward propagation
-        grads = backward_propagation(
-            # Y_train, a_cache, z_cache, weights, activations, current_lr
-            X_noisy,  # Add X input (was missing)
+        grads, bn_grads = backward_propagation(
+            X_noisy,
             Y_train,
             a_cache,
             z_cache,
             weights,
             activations,
-            current_lr  # This is the eta parameter
+            current_lr,
+            cache
         )
 
-        # Mise à jour des poids avec gradient clipping
+        # Update weights and batch norm parameters
         weights, velocities = update_weights(
-            weights, grads, momentum, velocities, clip_value=1.0
+            weights,
+            grads,
+            bn_params,
+            bn_grads,
+            momentum,
+            velocities,
+            clip_value=1.0
         )
 
-        # Validation
+        # Validation phase
         val_loss, val_acc = float('inf'), 0.0
         if X_val.size > 0:
-            val_a, _, _ = forward_propagation(X_val, weights, biases, activations, training=False)
+            val_a, _, _ = forward_propagation(
+                X_val,
+                weights,
+                biases,
+                activations,
+                bn_params=bn_params,
+                training=False,
+                dropout_rate=0.0
+            )
             val_ce = cross_entropy_loss(val_a[-1], Y_val.T)
             val_loss = val_ce + 0.5 * lambda_l2 * sum(np.sum(w**2) for w in weights)
             val_acc = compute_accuracy(val_a[-1], Y_val.T)
 
-        # Adaptation du taux d'apprentissage
+        # Adaptive learning rate
         if adaptive_eta:
-            if epoch < 10:
-                current_lr = learning_rate * (epoch + 1) / 10  # Warmup
+            if epoch < 10:  # Learning rate warmup
+                current_lr = learning_rate * (epoch + 1) / 10
             elif val_loss < best_loss * 0.99:
                 current_lr *= 1.05
                 best_loss = val_loss
@@ -109,19 +116,26 @@ def train_model(
             else:
                 current_lr *= 0.7
 
-        # Stockage des métriques
+        # Store metrics
+        train_acc = compute_accuracy(a_cache[-1], Y_train)
         progress.add_epoch(
             time.time() - epoch_start,
             train_loss,
             val_loss,
-            compute_accuracy(a_cache[-1], Y_train),
+            train_acc,
             val_acc,
             current_lr
         )
 
-        # Affichage
+        # Early stopping
+        if (epoch > patience and
+            np.mean(progress.val_losses[-patience:]) >= progress.val_losses[-patience-1]):
+            break
+
+        # Progress logging
         if verbose and epoch % 1 == 0:
             print(f"Epoch {epoch+1:03d}/{max_epochs} | LR: {current_lr:.5f} | "
-                  f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+                  f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | "
+                  f"Train Acc: {train_acc:.2%} | Val Acc: {val_acc:.2%}")
 
     return best_weights, best_biases, progress

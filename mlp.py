@@ -1,3 +1,4 @@
+# mlp.py
 import numpy as np
 from propagation import forward_propagation
 from training import train_model
@@ -5,23 +6,16 @@ from file_utils import save_hidden_units
 from mlp_math import activation_functions
 
 class MLP:
-    def __init__(self, input_size, hidden_sizes, output_size, 
+    def __init__(self, input_size, hidden_sizes, output_size,
                  activation='sigmoid', learning_rate=0.1, max_epochs=100,
-                 patience=5, adaptive_eta=False, noise_sigma=0.0, momentum=0.0):
+                 patience=5, adaptive_eta=False, noise_sigma=0.0, momentum=0.0,
+                 use_batch_norm=False, dropout_rate=0.0):
         """
-        Multilayer Perceptron with enhanced training capabilities
-        
+        Enhanced MLP with batch normalization and dropout support.
+
         Parameters:
-        input_size (int): Number of input features
-        hidden_sizes (list): List of integers specifying hidden layer sizes
-        output_size (int): Number of output neurons
-        activation (str): Activation function for hidden layers
-        learning_rate (float): Initial learning rate
-        max_epochs (int): Maximum number of training epochs
-        patience (int): Early stopping patience
-        adaptive_eta (bool): Enable adaptive learning rate
-        noise_sigma (float): Standard deviation for input noise
-        momentum (float): Momentum factor (0-1)
+        use_batch_norm (bool): Enable batch normalization
+        dropout_rate (float): Dropout probability (0.0-1.0)
         """
         self.input_size = input_size
         self.hidden_sizes = hidden_sizes
@@ -33,64 +27,52 @@ class MLP:
         self.adaptive_eta = adaptive_eta
         self.noise_sigma = noise_sigma
         self.momentum = momentum
-        self.use_batch_norm = True # suggestion
-        
-        # Initialize network parameters
-        self.weights, self.biases = self._initialize_parameters()
+        self.use_batch_norm = use_batch_norm
+        self.dropout_rate = dropout_rate
+
+        # Initialize parameters with batch norm weights
+        self.weights, self.biases, self.bn_params = self._initialize_parameters()
         self.best_weights = None
         self.best_biases = None
         self.training_history = None
 
-    # def _initialize_parameters(self):
-    #     """Initialize weights with He initialization and biases to zero"""
-    #     layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
-    #     weights = []
-    #     biases = []
-    #
-    #     for i in range(len(layer_sizes)-1):
-    #         # He initialization for ReLU variants, sqrt(2/n) for others
-    #         if self.activation in ['relu', 'leakyrelu']:
-    #             std = np.sqrt(2.0 / layer_sizes[i])
-    #         else:
-    #             std = np.sqrt(1.0 / layer_sizes[i])
-    #
-    #         weights.append(np.random.randn(layer_sizes[i+1], layer_sizes[i]) * std)
-    #         biases.append(np.zeros((layer_sizes[i+1], 1)))
-    #
-    #     return weights, biases
     def _initialize_parameters(self):
+        """Initialize weights, biases, and batch norm parameters"""
         layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
         weights = []
         biases = []
+        bn_params = []
 
         for i in range(len(layer_sizes) - 1):
+            # Weight initialization
             if self.activation.lower() in ['relu', 'leakyrelu']:
                 std = np.sqrt(2.0 / layer_sizes[i])
             else:
-                std = np.sqrt(1.0 / layer_sizes[i])  # Simplification
+                std = np.sqrt(1.0 / layer_sizes[i])
+
             weights.append(np.random.randn(layer_sizes[i + 1], layer_sizes[i]) * std)
             biases.append(np.zeros((layer_sizes[i + 1], 1)))
 
-        return weights, biases
+            # Batch norm parameters
+            if self.use_batch_norm and i < len(layer_sizes) - 2:
+                bn_params.append({
+                    'gamma': np.ones((layer_sizes[i + 1], 1)),
+                    'beta': np.zeros((layer_sizes[i + 1], 1)),
+                    'running_mean': np.zeros((layer_sizes[i + 1], 1)),
+                    'running_var': np.ones((layer_sizes[i + 1], 1))
+                })
+            else:
+                bn_params.append(None)
+
+        return weights, biases, bn_params
 
     def train(self, X_train, Y_train, X_val=None, Y_val=None):
-        """
-        Train the network with optional validation set
-        X_train: Training samples (n_samples, n_features)
-        Y_train: Training labels (n_samples, n_outputs)
-        X_val: Validation samples (optional)
-        Y_val: Validation labels (optional)
-        """
-        # Convert to numpy arrays
+        """Enhanced training with batch norm and dropout support"""
         X_train = np.array(X_train)
         Y_train = np.array(Y_train)
-        X_val = np.array(X_val) if X_val is not None else np.array([])
-        Y_val = np.array(Y_val) if Y_val is not None else np.array([])
-        
-        # Build activation list (hidden layers + output)
         activations = [self.activation] * len(self.hidden_sizes) + ['sigmoid']
-        
-        # Train the network
+
+        # Train with modified forward/backward passes
         final_weights, final_biases, history = train_model(
             X_train=X_train,
             Y_train=Y_train,
@@ -98,77 +80,77 @@ class MLP:
             Y_val=Y_val,
             weights=self.weights,
             biases=self.biases,
+            bn_params=self.bn_params,
             activations=activations,
             learning_rate=self.learning_rate,
             max_epochs=self.max_epochs,
             patience=self.patience,
             noise_sigma=self.noise_sigma,
             momentum=self.momentum,
+            use_batch_norm=self.use_batch_norm,
+            dropout_rate=self.dropout_rate,
             adaptive_eta=self.adaptive_eta
         )
-        
-        # Store trained parameters and history
+
         self.weights = final_weights
         self.biases = final_biases
         self.training_history = history
-        
         return history
 
-    # def predict(self, X):
-    #     """Make predictions for input samples"""
-    #     X = np.array(X).T  # Convert to column vectors
-    #     activations, _ = forward_propagation(X, self.weights, self.biases,
-    #                                        [self.activation]*len(self.hidden_sizes) + ['sigmoid'])
-    #     return activations[-1].T  # Return as row vectors
     def predict(self, X):
-        X = np.array(X).T  # Convert to column vectors
-        activations, _, _ = forward_propagation(  # Add third unpacking
+        """Prediction with disabled dropout and batch norm in eval mode"""
+        X = np.array(X).T
+        activations, _, _ = forward_propagation(
             X,
             self.weights,
             self.biases,
-            [self.activation] * len(self.hidden_sizes) + ['sigmoid']
+            [self.activation] * len(self.hidden_sizes) + ['sigmoid'],
+            training=False,  # Disable dropout/batch norm during inference
+            bn_params=self.bn_params,
+            dropout_rate=0.0
         )
         return activations[-1].T
 
     def evaluate(self, X, Y):
-        """Calculate accuracy for given samples and labels"""
+        """Enhanced evaluation with confusion matrix support"""
         predictions = self.predict(X)
         y_true = np.argmax(Y, axis=1)
         y_pred = np.argmax(predictions, axis=1)
         return np.mean(y_pred == y_true)
 
-    # def save_hidden_units(self, X):
-    #     """Save activations of all hidden layers for given input"""
-    #     X = np.array(X).T  # Convert to column vectors
-    #     activations, _ = forward_propagation(X, self.weights, self.biases,
-    #                                        [self.activation]*len(self.hidden_sizes) + ['sigmoid'])
-    #
-    #     # Extract hidden layer activations (exclude input and output)
-    #     hidden_activations = activations[1:-1]
-    #
-    #     # Format and save activations
-    #     formatted_activations = []
-    #     for layer_idx, layer_acts in enumerate(hidden_activations):
-    #         # Transpose to get samples as rows, neurons as columns
-    #         formatted_activations.append(layer_acts.T)
-    #
-    #     save_hidden_units(formatted_activations)
+    def confusion_matrix(self, X, Y):
+        """Generate confusion matrix without external dependencies"""
+        y_pred = np.argmax(self.predict(X), axis=1)
+        y_true = np.argmax(Y, axis=1)
+
+        # Get all possible classes
+        classes = np.unique(np.concatenate([y_true, y_pred]))
+        n_classes = len(classes)
+
+        # Initialize matrix
+        matrix = np.zeros((n_classes, n_classes), dtype=int)
+
+        # Populate matrix
+        for t, p in zip(y_true, y_pred):
+            matrix[t, p] += 1
+
     def save_hidden_units(self, X):
+        """Save hidden activations with dropout disabled"""
         X = np.array(X).T
-        activations, _, _ = forward_propagation(  # Add third unpacking
+        activations, _, _ = forward_propagation(
             X,
             self.weights,
             self.biases,
-            [self.activation] * len(self.hidden_sizes) + ['sigmoid']
+            [self.activation] * len(self.hidden_sizes) + ['sigmoid'],
+            training=False  # Disable dropout for feature extraction
         )
 
         hidden_activations = activations[1:-1]
         formatted_activations = [layer_acts.T for layer_acts in hidden_activations]
-
         save_hidden_units(formatted_activations)
-        
+
     def get_architecture(self):
-        """Return network architecture description"""
+        """Return enhanced architecture description"""
         return {
             'input_size': self.input_size,
             'hidden_layers': self.hidden_sizes,
@@ -177,10 +159,12 @@ class MLP:
             'learning_rate': self.learning_rate,
             'adaptive_learning': self.adaptive_eta,
             'noise_level': self.noise_sigma,
-            'momentum': self.momentum
+            'momentum': self.momentum,
+            'batch_norm': self.use_batch_norm,
+            'dropout_rate': self.dropout_rate
         }
 
     def reset_parameters(self):
-        """Re-initialize network parameters"""
-        self.weights, self.biases = self._initialize_parameters()
+        """Re-initialize all parameters including batch norm"""
+        self.weights, self.biases, self.bn_params = self._initialize_parameters()
         self.training_history = None

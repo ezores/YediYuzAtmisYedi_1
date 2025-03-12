@@ -1,11 +1,19 @@
+# main.py
 import os
 import sys
 import argparse
 import configparser
+import logging
 import numpy as np
-from file_utils import process_file, getES,split_data, DEFAULT_OUTPUT_ENCODING
+from file_utils import process_file, getES, split_data, kfold_split, DEFAULT_OUTPUT_ENCODING
 from mlp import MLP
-from visualization import generate_network_visualization
+from visualization import (
+    plot_training_history,
+    plot_confusion_matrix,
+    plot_weight_distribution,
+    plot_activation_distribution,
+    generate_network_visualization
+)
 from mlp_math import activation_functions
 
 # Configuration defaults
@@ -17,244 +25,200 @@ DEFAULT_CONFIG = {
     'base_donnees': '40',
     'adaptive_eta': 'False',
     'noise_sigma': '0.0',
-    'momentum': '0.0'
+    'momentum': '0.0',
+    'batch_norm': 'False',
+    'dropout_rate': '0.0',
+    'k_folds': '5'
 }
 
 
+def setup_logging():
+    """Configure logging system"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('mlp_training.log'),
+            logging.StreamHandler()
+        ]
+    )
+
+
 def parse_arguments():
+    """Enhanced argument parser with new features"""
     parser = argparse.ArgumentParser(description="MLP Speech Recognition System")
 
     # Mode selection
     mode_group = parser.add_mutually_exclusive_group(required=True)
-    mode_group.add_argument('--train', action='store_true',
-                            help='Train the model')
-    mode_group.add_argument('--vc', action='store_true',
-                            help='Run k-fold cross-validation')
-    mode_group.add_argument('--test', action='store_true',
-                            help='Test trained model')
+    mode_group.add_argument('--train', action='store_true', help='Train the model')
+    mode_group.add_argument('--vc', action='store_true', help='Run k-fold cross-validation')
+    mode_group.add_argument('--test', action='store_true', help='Test trained model')
 
-    # Training parameters with enhanced help
-    parser.add_argument('--eta', type=float,
-                        help='Initial learning rate (suggested: 0.001-0.5)')
-    parser.add_argument('--neurons', nargs='+', type=int,
-                        help='Hidden layer sizes (e.g., 128 64 for two layers)')
+    # Model parameters
+    parser.add_argument('--eta', type=float, help='Initial learning rate (0.001-0.5)')
+    parser.add_argument('--neurons', nargs='+', type=int, help='Hidden layer sizes (e.g., 128 64)')
     parser.add_argument('--activations', nargs='+',
                         help=f"Activation functions ({', '.join(activation_functions.keys())})")
-    parser.add_argument('--base', type=int, choices=[40, 50, 60],
-                        help='Database size: 40|50|60 segments')
-    parser.add_argument('--epochs', type=int,
-                        help='Max training epochs (typically 50-500)')
-    parser.add_argument('--adaptive', action='store_true',
-                        help='Enable adaptive learning rate')
-    parser.add_argument('--noise', type=float,
-                        help='Input noise sigma (suggested: 0.0-0.5)')
+    parser.add_argument('--base', type=int, choices=[40, 50, 60], help='Database size: 40|50|60')
+    parser.add_argument('--epochs', type=int, help='Max training epochs (50-500)')
+    parser.add_argument('--folds', type=int, default=5, help='Number of k-folds for cross-validation')
+    parser.add_argument('--adaptive', action='store_true', help='Enable adaptive learning rate')
+    parser.add_argument('--noise', type=float, help='Input noise sigma (0.0-0.5)')
+    parser.add_argument('--batch_norm', action='store_true', help='Enable batch normalization')
+    parser.add_argument('--dropout', type=float, help='Dropout rate (0.0-0.9)')
+    parser.add_argument('--augment', action='store_true', help='Enable data augmentation')
 
     return parser.parse_args()
 
 
 def interactive_config(args):
-    """Enhanced interactive configuration with guidance"""
+    """Enhanced interactive configuration with new parameters"""
     print("\n=== Network Configuration ===")
 
-    # Get available activations dynamically
-    from mlp_math import activation_functions
-    activations_list = list(activation_functions.keys())
-
-    # Learning rate with examples
+    # Existing parameters
     if args.eta is None:
-        args.eta = float(input(
-            f"Initial learning rate (e.g., 0.01-0.5) [{DEFAULT_CONFIG['eta']}]: "
-        ) or DEFAULT_CONFIG['eta'])
+        args.eta = float(input(f"Initial learning rate [{DEFAULT_CONFIG['eta']}]: ") or DEFAULT_CONFIG['eta'])
 
-    # Hidden neurons with architecture examples
     if not args.neurons:
         default_neurons = DEFAULT_CONFIG['neurones_par_couche_cachee']
         args.neurons = list(map(int, input(
-            f"Hidden layer sizes (e.g., '64' or '128 64') [{default_neurons}]: "
-        ).split())) or default_neurons.split(',')
+            f"Hidden layer sizes (e.g., '64' or '128 64') [{default_neurons}]: ").split())) or default_neurons.split(
+            ',')
 
-    # Activation functions with available options
     if not args.activations:
-        print(f"Available activations: {', '.join(activations_list)}")
-        args.activations = [input(
-            f"Activation function ({'/'.join(activations_list)}) [{DEFAULT_CONFIG['fct']}]: "
-        ) or DEFAULT_CONFIG['fct']]
+        print(f"Available activations: {', '.join(activation_functions.keys())}")
+        args.activations = [input(f"Activation function [{DEFAULT_CONFIG['fct']}]: ") or DEFAULT_CONFIG['fct']]
 
-    # Database size with explanation
     if args.base is None:
-        args.base = int(input(
-            "Database size (40=small/50=medium/60=large) [40]: "
-        ) or DEFAULT_CONFIG['base_donnees'])
+        args.base = int(
+            input(f"Database size (40/50/60) [{DEFAULT_CONFIG['base_donnees']}]: ") or DEFAULT_CONFIG['base_donnees'])
 
-    # Training epochs with recommendation
     if args.epochs is None:
-        args.epochs = int(input(
-            "Max training epochs (recommended: 100-200) [100]: "
-        ) or DEFAULT_CONFIG['nb_epoches'])
+        args.epochs = int(input(f"Max epochs [{DEFAULT_CONFIG['nb_epoches']}]: ") or DEFAULT_CONFIG['nb_epoches'])
 
-    # Adaptive learning with explanation
+    # New parameters
     if not args.adaptive:
-        args.adaptive = input(
-            "Use adaptive learning? (y/n) [n]: "
-        ).lower() in ['y', 'yes']
+        args.adaptive = input("Use adaptive learning rate? (y/n) [n]: ").lower() in ['y', 'yes']
 
-    # Input noise with guidance
     if args.noise is None:
-        args.noise = float(input(
-            "Input noise sigma (0.0 to 0.5, 0=disable) [0]: "
-        ) or 0)
+        args.noise = float(
+            input(f"Input noise sigma [{DEFAULT_CONFIG['noise_sigma']}]: ") or DEFAULT_CONFIG['noise_sigma'])
+
+    if not args.batch_norm:
+        args.batch_norm = input("Enable batch normalization? (y/n) [n]: ").lower() in ['y', 'yes']
+
+    if args.dropout is None:
+        args.dropout = float(
+            input(f"Dropout rate (0-0.9) [{DEFAULT_CONFIG['dropout_rate']}]: ") or DEFAULT_CONFIG['dropout_rate'])
+
+    if args.augment is None:
+        args.augment = input("Enable data augmentation? (y/n) [n]: ").lower() in ['y', 'yes']
 
     return args
 
-def load_or_create_config(args):
-    """Config manager with validation"""
-    config = configparser.ConfigParser()
-    
-    if os.path.exists('config.ini'):
-        config.read('config.ini')
-    else:
-        config['DEFAULT'] = DEFAULT_CONFIG
-    
-    # Update with command-line arguments
-    config['DEFAULT']['eta'] = str(args.eta)
-    config['DEFAULT']['neurones_par_couche_cachee'] = ','.join(map(str, args.neurons))
-    config['DEFAULT']['fct'] = args.activations[0]
-    config['DEFAULT']['base_donnees'] = str(args.base)
-    config['DEFAULT']['nb_epoches'] = str(args.epochs)
-    config['DEFAULT']['adaptive_eta'] = str(args.adaptive)
-    config['DEFAULT']['noise_sigma'] = str(args.noise)
-    
-    # Write config
-    with open('config.ini', 'w') as configfile:
-        config.write(configfile)
-    
-    return config
 
+def prepare_datasets(base_sizes: list, input_dir: str = "InputFiles",
+                     output_dir: str = "OutputFiles", augment: bool = False,
+                     noise_sigma: float = 0.0) -> dict:
+    """Generate multiple datasets with optional augmentation"""
+    datasets = {}
+    for size in base_sizes:
+        output_path = os.path.join(output_dir, f"data_train_{size}_ligne.txt")
+        if not os.path.exists(output_path):
+            process_file(
+                os.path.join(input_dir, "data_train.txt"),
+                output_path,
+                elements_per_segment=26,
+                selected_elements=12,
+                total_segments=size,
+                augment=augment,
+                noise_sigma=noise_sigma
+            )
+        datasets[size] = output_path
+    return datasets
 
-def prepare_datasets(base_size: int,
-                     input_dir: str = "InputFiles",
-                     output_dir: str = "OutputFiles") -> str:
-    # Build paths using os.path.join
-    input_path = os.path.join(input_dir, "data_train.txt")
-    output_path = os.path.join(output_dir, f"data_train_{base_size}_ligne.txt")
-
-    # Ensure the output directory exists
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-
-    if not os.path.exists(output_path):
-        print("\n=== Starting Data Processing ===")
-        # Call your file processing function
-        process_file(
-            input_path,
-            output_path,
-            elements_per_segment=26,
-            selected_elements=12,
-            total_segments=base_size
-        )
-
-    return output_path
 
 def main():
-    # Parse and validate arguments
+    setup_logging()
     args = parse_arguments()
     args = interactive_config(args)
-    config = load_or_create_config(args)
-    
+
     try:
-        # Prepare dataset
-        data_file = prepare_datasets(args.base)
-        print(f"Loading processed file: {data_file}")  # Add this debug line
-        
-        # Pre-validate data file
-        print("\n=== Input File Validation ===")
-        with open(data_file, 'r') as f:
-            for _ in range(3):
-                line = f.readline().strip()
-                if not line:
-                    continue
-                if ':' not in line:
-                    print(f"Validation Error: Missing colon in sample line: '{line[:50]}...'")
-                else:
-                    identifier, values = line.split(':', 1)
-                    print(f"Sample Line OK - ID: {identifier}, Values: {len(values.split())} features")
-                    
-        # Load data with enhanced validation
+        # Prepare all three datasets
+        logging.info("Preparing datasets...")
+        datasets = prepare_datasets(
+            base_sizes=[40, 50, 60],
+            augment=args.augment,
+            noise_sigma=args.noise
+        )
+
+        # Load main dataset
+        data_file = datasets[args.base]
+        logging.info(f"Using dataset: {data_file}")
         X, Y = getES(data_file, DEFAULT_OUTPUT_ENCODING)
-        
-        # Verify dataset integrity
-        if X.size == 0 or Y.size == 0:
-            raise ValueError("Empty dataset loaded")
 
-    except Exception as e:
-        print(f"\nCritical error: {e}")
-        print("Possible solutions:")
-        print("1. Verify input files exist in InputFiles/ directory")
-        print("2. Check data files use format: 'ID: val1 val2 ...'")
-        print("3. Ensure numeric values after colon separator")
-        print("4. Confirm identifiers are digits 0-9")
-        sys.exit(1)
+        # Initialize MLP with new parameters
+        mlp = MLP(
+            input_size=X.shape[1],
+            hidden_sizes=args.neurons,
+            output_size=10,
+            activation=args.activations[0],
+            learning_rate=args.eta,
+            max_epochs=args.epochs,
+            adaptive_eta=args.adaptive,
+            noise_sigma=args.noise,
+            momentum=0.0,
+            use_batch_norm=args.batch_norm,
+            dropout_rate=args.dropout
+        )
 
-    # Split data based on mode
-    if args.train:
-        X_train, Y_train, X_val, Y_val = split_data(X, Y, cv_split=0.2)
-    elif args.vc:
-        X_train, Y_train, X_val, Y_val = split_data(X, Y, cv_split=0.5)
-    else:  # test mode
-        X_train, Y_train, X_val, Y_val = X, Y, np.array([]), np.array([])
+        # Training workflow
+        if args.train or args.vc:
+            logging.info("\n=== Starting Training ===")
 
-    # Initialize MLP
-    mlp = MLP(
-        input_size=X.shape[1],
-        hidden_sizes=args.neurons,
-        output_size=10,
-        activation=args.activations[0],
-        learning_rate=args.eta,
-        max_epochs=args.epochs,
-        adaptive_eta=args.adaptive,
-        noise_sigma=args.noise
-    )
-
-    # Training process
-    if args.train or args.vc:
-        print("\n=== Starting Training ===")
-        try:
-            mlp.train(X_train, Y_train, X_val, Y_val)
-            
-            # Save hidden units
-            mlp.save_hidden_units(X_train)
-            
-            # Final evaluation
-            if args.train:
-                print("\n=== Training Performance ===")
-                train_acc = mlp.evaluate(X_train, Y_train)
-                print(f"Training Accuracy: {train_acc:.2%}")
-                
-                print("\n=== Validation Performance ===")
-                val_acc = mlp.evaluate(X_val, Y_val)
-                print(f"Validation Accuracy: {val_acc:.2%}")
-            
             if args.vc:
-                print("\n=== Cross-Validation Results ===")
-                vc_acc = mlp.evaluate(X_val, Y_val)
-                print(f"Cross-Validation Accuracy: {vc_acc:.2%}")
+                logging.info(f"Running {args.folds}-fold cross-validation")
+                fold_accuracies = []
 
-        except Exception as e:
-            print(f"\nTraining failed: {str(e)}")
-            sys.exit(1)
+                for fold, (X_train, Y_train, X_val, Y_val) in enumerate(kfold_split(X, Y, k=args.folds)):
+                    logging.info(f"\n--- Fold {fold + 1}/{args.folds} ---")
+                    mlp.train(X_train, Y_train, X_val, Y_val)
+                    val_acc = mlp.evaluate(X_val, Y_val)
+                    fold_accuracies.append(val_acc)
+                    logging.info(f"Fold {fold + 1} Accuracy: {val_acc:.2%}")
 
-    if args.test:
-        print("\n=== Testing Mode ===")
-        try:
+                logging.info("\n=== Cross-Validation Results ===")
+                logging.info(f"Mean Accuracy: {np.mean(fold_accuracies):.2%}")
+                logging.info(f"Std Deviation: {np.std(fold_accuracies):.2%}")
+
+            else:  # Standard training
+                X_train, Y_train, X_val, Y_val = split_data(X, Y, cv_split=0.2)
+                mlp.train(X_train, Y_train, X_val, Y_val)
+
+                # Visualizations
+                plot_training_history(mlp.training_history)
+                plot_weight_distribution(mlp.weights)
+
+                if X_val.size > 0:
+                    cm = mlp.confusion_matrix(X_val, Y_val)
+                    plot_confusion_matrix(cm, class_names=list(map(str, range(10))))
+
+        # Testing workflow
+        if args.test:
+            logging.info("\n=== Testing ===")
             test_file = os.path.join("InputFiles", "data_test.txt")
             X_test, Y_test = getES(test_file, DEFAULT_OUTPUT_ENCODING)
             test_acc = mlp.evaluate(X_test, Y_test)
-            print(f"Test Accuracy: {test_acc:.2%}")
-        except Exception as e:
-            print(f"\nTesting failed: {str(e)}")
-            sys.exit(1)
+            logging.info(f"Test Accuracy: {test_acc:.2%}")
 
-    generate_network_visualization(mlp,"Visualisation_MLP.html")
+            # Generate final visualizations
+            generate_network_visualization(mlp)
+            plot_activation_distribution(mlp.save_hidden_units(X_test))
+
+    except Exception as e:
+        logging.error(f"Critical error: {str(e)}", exc_info=True)
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

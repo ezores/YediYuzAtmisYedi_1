@@ -1,15 +1,59 @@
 import os
 import numpy as np
-from typing import List, Tuple, Dict, Union
+from typing import List, Tuple, Dict, Union,Generator
 
 DEFAULT_OUTPUT_ENCODING = {str(i): [1 if j == i else 0 for j in range(10)] for i in range(10)}
 
 
-def process_file(input_file, output_file, elements_per_segment=26, selected_elements=12, total_segments=40):
+def kfold_split(samples: np.ndarray, labels: np.ndarray, k: int = 5) -> Generator[Tuple, None, None]:
+    """
+    Generate K folds for cross-validation with shuffling.
+
+    Args:
+        samples: Input features matrix (n_samples, n_features)
+        labels: Corresponding labels (n_samples, n_outputs)
+        k: Number of folds
+
+    Yields:
+        (X_train, Y_train, X_val, Y_val) for each fold
+    """
+    n_samples = len(samples)
+    indices = np.random.permutation(n_samples)
+    fold_size = n_samples // k
+
+    for i in range(k):
+        val_indices = indices[i * fold_size: (i + 1) * fold_size]
+        train_indices = np.concatenate([indices[:i * fold_size], indices[(i + 1) * fold_size:]])
+
+        yield (
+            samples[train_indices], labels[train_indices],
+            samples[val_indices], labels[val_indices]
+        )
+
+
+def add_noise_to_values(values: np.ndarray, sigma: float = 0.1) -> np.ndarray:
+    """
+    Add Gaussian noise to input values for data augmentation.
+
+    Args:
+        values: Input values array (n_features,)
+        sigma: Standard deviation of noise
+
+    Returns:
+        Noisy values array
+    """
+    return values + np.random.normal(0, sigma, values.shape)
+
+
+def process_file(input_file, output_file, elements_per_segment=26, selected_elements=12,
+                 total_segments=40, augment=False, noise_sigma=0.1):
+    """
+    Enhanced data processing with optional augmentation.
+    """
     all_values = []
     VALID_IDS = set(DEFAULT_OUTPUT_ENCODING.keys())
 
-    # Première passe : collecter toutes les valeurs
+    # First pass: collect global statistics
     with open(input_file, 'r') as f:
         for line in f:
             if ':' not in line:
@@ -21,12 +65,10 @@ def process_file(input_file, output_file, elements_per_segment=26, selected_elem
             except:
                 continue
 
-    # Calcul des statistiques globales
     global_mean = np.mean(all_values)
     global_std = np.std(all_values) + 1e-8
-    #values = (values - global_mean) / (global_std + 1e-8)
 
-    # Deuxième passe : traitement avec normalisation globale
+    # Second pass: process data
     processed_lines = []
     with open(input_file, 'r') as f:
         for line in f:
@@ -40,19 +82,27 @@ def process_file(input_file, output_file, elements_per_segment=26, selected_elem
                 continue
 
             try:
-                values = (np.array(list(map(float, values_str.split()))) - global_mean) / global_std
+                # Normalize values (fixed syntax)
+                values = np.array(list(map(float, values_str.split())))
+                values = (values - global_mean) / global_std
+
+                # Data augmentation
+                if augment:
+                    values = add_noise_to_values(values, sigma=noise_sigma)
+
+                # Extract features
                 extracted = []
                 for i in range(total_segments):
                     start = i * elements_per_segment
                     end = start + selected_elements
-                    #extracted.extend(values[start:end])
-                    extracted.extend(values[start:end].tolist())  # Conversion explicite pour éviter les erreurs de type
-                #processed_lines.append(f"{identifier}: {' '.join(map('{:.6f}'.format, extracted))}")
-                    # Formatage corrigé avec des flottants Python
+                    extracted.extend(values[start:end].tolist())
+
+                # Format line
                 formatted_values = [f"{v:.6f}" for v in extracted]
                 processed_line = f"{identifier}: {' '.join(formatted_values)}"
                 processed_lines.append(processed_line)
-            except:
+            except Exception as e:
+                print(f"Error processing line: {str(e)}")
                 continue
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
