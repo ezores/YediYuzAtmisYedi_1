@@ -62,6 +62,7 @@ def update_weights(weights, gradients, momentum=0.9, velocity=None, clip_value=1
     gradients = [np.clip(g, -clip_value, clip_value) for g in gradients]
     
     # Étape 2: Transposer les gradients si nécessaire pour correspondre aux poids
+
     adjusted_gradients = []
     for w, g in zip(weights, gradients):
         if g.shape != w.shape:
