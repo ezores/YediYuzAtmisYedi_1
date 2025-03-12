@@ -1,8 +1,8 @@
 ```md
 # Réseau de Neurones pour la Reconnaissance de la Parole
-
+```
 Ce projet implémente un réseau de neurones à rétropropagation du gradient d’erreur pour l'extraction de caractéristiques et la reconnaissance de la parole. L'implémentation est basée sur NumPy pour des performances optimisées.
-
+```
 📂 Structure du Projet
 
 
@@ -18,7 +18,7 @@ Ce projet implémente un réseau de neurones à rétropropagation du gradient d�
 │── pictures/            # Visualisations du réseau
 │── requirements.txt     # Dépendances Python
 
-
+```
 🚀 Installation
 
 1️⃣ Prérequis
@@ -31,7 +31,7 @@ git clone [https://github.com/utilisateur/Projet_NN.git](https://github.com/ezor
 cd YediYuzAtmisYedi
 ```
 
-3️⃣ Installer les dépendances**
+3️⃣ Installer les dépendances
 ```sh
 pip install -r requirements.txt
 ```
