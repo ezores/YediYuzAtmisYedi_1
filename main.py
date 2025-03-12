@@ -130,19 +130,30 @@ def load_or_create_config(args):
     
     return config
 
-def prepare_datasets(base_size: int) -> str:
-    input_path = os.path.join("InputFiles", "data_train.txt")
-    output_path = os.path.join("OutputFiles", f"data_train_{base_size}_ligne.txt")
-    
+
+def prepare_datasets(base_size: int,
+                     input_dir: str = "InputFiles",
+                     output_dir: str = "OutputFiles") -> str:
+    # Build paths using os.path.join
+    input_path = os.path.join(input_dir, "data_train.txt")
+    output_path = os.path.join(output_dir, f"data_train_{base_size}_ligne.txt")
+
+    # Ensure the output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
     if not os.path.exists(output_path):
         print("\n=== Starting Data Processing ===")
-        # Add parameter validation for space-separated input
-        process_file(input_path, output_path, 
-                    elements_per_segment=26,
-                    selected_elements=12,
-                    total_segments=base_size)
-    
-    return output_path  # Return path to PROCESSED file
+        # Call your file processing function
+        process_file(
+            input_path,
+            output_path,
+            elements_per_segment=26,
+            selected_elements=12,
+            total_segments=base_size
+        )
+
+    return output_path
 
 def main():
     # Parse and validate arguments
