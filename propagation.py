@@ -1,39 +1,56 @@
 import numpy as np
-from mlp_math import activation_functions
+from mlp_math import activation_functions,hadamard_product,sigmoid
 
 def forward_propagation(X, weights, biases, activations, training=True):
     activations_cache = [X]
     z_cache = []
-    bn_cache = []
 
     for i, (W, b) in enumerate(zip(weights, biases)):
         z = W @ activations_cache[-1] + b
-
-        # Batch Normalization
-        if i < len(weights) - 1 and training:
-            mean = np.mean(z, axis=1, keepdims=True)
-            var = np.var(z, axis=1, keepdims=True)
-            z_hat = (z - mean) / np.sqrt(var + 1e-5)
-            gamma, beta = 1.0, 0.0  # À remplacer par des paramètres appris
-            z = gamma * z_hat + beta
-            bn_cache.append((mean, var, gamma, beta))
 
         z_cache.append(z)
         a = activation_functions[activations[i]][0](z)
         activations_cache.append(a)
 
-    return activations_cache, z_cache, bn_cache
+    return activations_cache, z_cache
 
-def backward_propagation(y, activations_cache, z_cache, weights, activations, eta):
-    gradients = []
-    delta = activations_cache[-1] - y  # Softmax + entropie croisée
+def backward_propagation(x,y, activations_cache, z_cache, weights, activations, eta):
+    deltas = [None] * len(weights)
+    gradients = [None] * len(weights)
+    L = len(weights)-1
+    
+    delta_L = y-activations_cache[-1]  
 
-    for l in reversed(range(len(weights))):
-        grad = (delta @ activations_cache[l].T) * eta
-        gradients.insert(0, grad)
+    if activations[L] != 'softmax' and activations[L] != 'sigmoid':
+        delta_L = hadamard_product(delta_L, activation_functions[activations[L]][1](z_cache[-1]))
+        deltas[L] = delta_L
+         
+            
+        for l in range(L - 1, -1, -1):
+            temp = weights[l + 1].T @ deltas[l + 1]
+            deriv = activation_functions[activations[l]][1](z_cache[l])
+            deltas[l] = hadamard_product(temp, deriv)
 
-        if l > 0:
-            delta = (weights[l].T @ delta) * activation_functions[activations[l-1]][1](z_cache[l-1])
+
+    elif activations[L] == 'sigmoid':
+        der_sig = activation_functions[activations[-1]][1](activations_cache[-1])
+        print(der_sig)
+        delta_L = hadamard_product(delta_L, der_sig)
+        deltas[L] = delta_L
+        print("delta_L")
+        print(delta_L)
+
+        for l in range(L - 1, -1, -1):
+            temp = weights[l + 1].T @ deltas[l + 1]
+            print("A1")
+            print(activations_cache[L])
+            deriv = activation_functions[activations[l]][1](activations_cache[l+1])
+            deltas[l] = hadamard_product(temp, deriv)
+
+    gradients[0]= eta*x*deltas[0].T
+
+    for l in range(1,len(weights)):
+        gradients[l] = eta*activations_cache[l]*deltas[l].T
 
     return gradients
 
