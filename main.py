@@ -5,6 +5,7 @@ import configparser
 import numpy as np
 from file_utils import process_file, getES, split_data, DEFAULT_OUTPUT_ENCODING
 from mlp import MLP
+from visualization import generate_network_visualization
 
 # Configuration defaults
 DEFAULT_CONFIG = {
@@ -215,6 +216,8 @@ def main():
         except Exception as e:
             print(f"\nTesting failed: {str(e)}")
             sys.exit(1)
+
+    generate_network_visualization(mlp,"Visualisation_MLP.html")
 
 if __name__ == "__main__":
     main()
