@@ -21,6 +21,6 @@ gradient = backward_propagation(X,y, activations_cache, z_cache, weights, activa
 print("Gradients:", gradient)
 
 # Update weights
-#new_weights, velocity = update_weights(weights, gradient)
-#print("Updated Weights:", new_weights)
+new_weights, velocity = update_weights(weights, gradient)
+print("Updated Weights:", new_weights)
 
