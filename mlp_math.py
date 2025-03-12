@@ -4,7 +4,7 @@ import numpy as np
 def sigmoid(z, derive=False):
     z = np.clip(z, -500, 500)  # Prevent overflow
     s = 1 / (1 + np.exp(-z))
-    return s * (1 - s) if derive else s
+    return z* (1 - z) if derive else s
 
 
 def relu(z, derive=False):
@@ -36,12 +36,13 @@ def cross_entropy_loss(Y_pred, Y_true, epsilon=1e-12):
     return -np.sum(Y_true * np.log(Y_pred)) / m
 
 activation_functions = {
-    'sigmoid': (sigmoid, sigmoid),
-    'relu': (relu, relu),
-    'leakyrelu': (leaky_relu, leaky_relu),
-    'tanh': (tanh, tanh),
-    'softmax': (softmax, softmax)
+    'sigmoid': (sigmoid, lambda x: sigmoid(x, derive=True)),
+    'relu': (relu, lambda x: relu(x, derive=True)),
+    'leakyrelu': (leaky_relu, lambda x: leaky_relu(x, derive=True)),
+    'tanh': (tanh, lambda x: tanh(x, derive=True)),
+    'softmax': (softmax, lambda x: softmax(x, derive=True))
 }
+
 
 def hadamard_product(a, b):
     """Element-wise product with broadcasting support"""
