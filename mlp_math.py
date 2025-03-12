@@ -36,11 +36,11 @@ def cross_entropy_loss(Y_pred, Y_true, epsilon=1e-12):
     return -np.sum(Y_true * np.log(Y_pred)) / m
 
 activation_functions = {
-    'sigmoid': (sigmoid, sigmoid(True)),
-    'relu': (relu, relu(True)),
-    'leakyrelu': (leaky_relu, leaky_relu(True)),
-    'tanh': (tanh, tanh(True)),
-    'softmax': (softmax, softmax(True))
+    'sigmoid': (sigmoid, sigmoid),
+    'relu': (relu, relu),
+    'leakyrelu': (leaky_relu, leaky_relu),
+    'tanh': (tanh, tanh),
+    'softmax': (softmax, softmax)
 }
 
 def hadamard_product(a, b):
