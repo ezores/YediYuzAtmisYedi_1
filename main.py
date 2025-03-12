@@ -3,9 +3,10 @@ import sys
 import argparse
 import configparser
 import numpy as np
-from file_utils import process_file, getES, split_data, DEFAULT_OUTPUT_ENCODING
+from file_utils import process_file, getES,split_data, DEFAULT_OUTPUT_ENCODING
 from mlp import MLP
 from visualization import generate_network_visualization
+from mlp_math import activation_functions
 
 # Configuration defaults
 DEFAULT_CONFIG = {
@@ -19,64 +20,89 @@ DEFAULT_CONFIG = {
     'momentum': '0.0'
 }
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="MLP Speech Recognition System")
-    
+
     # Mode selection
     mode_group = parser.add_mutually_exclusive_group(required=True)
-    mode_group.add_argument('--train', action='store_true', help='Training mode')
-    mode_group.add_argument('--vc', action='store_true', help='Validation cross-check mode')
-    mode_group.add_argument('--test', action='store_true', help='Testing mode')
+    mode_group.add_argument('--train', action='store_true',
+                            help='Train the model')
+    mode_group.add_argument('--vc', action='store_true',
+                            help='Run k-fold cross-validation')
+    mode_group.add_argument('--test', action='store_true',
+                            help='Test trained model')
 
-    # Training parameters
-    parser.add_argument('--eta', type=float, help='Learning rate')
-    parser.add_argument('--neurons', nargs='+', type=int, help='Number of neurons per hidden layer')
-    parser.add_argument('--activations', nargs='+', help='Activation functions for hidden layers')
-    parser.add_argument('--base', type=int, choices=[40,50,60], help='Database size (40, 50, 60)')
-    parser.add_argument('--epochs', type=int, help='Number of training epochs')
-    parser.add_argument('--adaptive', action='store_true', help='Use adaptive learning rate')
-    parser.add_argument('--noise', type=float, help='Add Gaussian noise with specified sigma')
+    # Training parameters with enhanced help
+    parser.add_argument('--eta', type=float,
+                        help='Initial learning rate (suggested: 0.001-0.5)')
+    parser.add_argument('--neurons', nargs='+', type=int,
+                        help='Hidden layer sizes (e.g., 128 64 for two layers)')
+    parser.add_argument('--activations', nargs='+',
+                        help=f"Activation functions ({', '.join(activation_functions.keys())})")
+    parser.add_argument('--base', type=int, choices=[40, 50, 60],
+                        help='Database size: 40|50|60 segments')
+    parser.add_argument('--epochs', type=int,
+                        help='Max training epochs (typically 50-500)')
+    parser.add_argument('--adaptive', action='store_true',
+                        help='Enable adaptive learning rate')
+    parser.add_argument('--noise', type=float,
+                        help='Input noise sigma (suggested: 0.0-0.5)')
 
     return parser.parse_args()
 
+
 def interactive_config(args):
-    """Enhanced interactive configuration with validation"""
-    print("\n=== Configuration Interactive ===")
-    
-    # Set defaults for missing attributes
-    args.adaptive = getattr(args, 'adaptive', False)
-    args.noise = getattr(args, 'noise', 0.0)
-    
-    # Learning rate
+    """Enhanced interactive configuration with guidance"""
+    print("\n=== Network Configuration ===")
+
+    # Get available activations dynamically
+    from mlp_math import activation_functions
+    activations_list = list(activation_functions.keys())
+
+    # Learning rate with examples
     if args.eta is None:
-        args.eta = float(input(f"Learning rate [{DEFAULT_CONFIG['eta']}]: ") or DEFAULT_CONFIG['eta'])
-    
-    # Hidden layer neurons
+        args.eta = float(input(
+            f"Initial learning rate (e.g., 0.01-0.5) [{DEFAULT_CONFIG['eta']}]: "
+        ) or DEFAULT_CONFIG['eta'])
+
+    # Hidden neurons with architecture examples
     if not args.neurons:
         default_neurons = DEFAULT_CONFIG['neurones_par_couche_cachee']
-        args.neurons = list(map(int, input(f"Hidden layer neurons (comma-sep) [{default_neurons}]: ").split(',')))
+        args.neurons = list(map(int, input(
+            f"Hidden layer sizes (e.g., '64' or '128 64') [{default_neurons}]: "
+        ).split())) or default_neurons.split(',')
 
-    # Activation functions
+    # Activation functions with available options
     if not args.activations:
-        from mlp_math import activation_functions
-        print(f"Available activations: {', '.join(activation_functions.keys())}")
-        args.activations = [input(f"Activation function [{DEFAULT_CONFIG['fct']}]: ") or DEFAULT_CONFIG['fct']]
+        print(f"Available activations: {', '.join(activations_list)}")
+        args.activations = [input(
+            f"Activation function ({'/'.join(activations_list)}) [{DEFAULT_CONFIG['fct']}]: "
+        ) or DEFAULT_CONFIG['fct']]
 
-    # Database size
+    # Database size with explanation
     if args.base is None:
-        args.base = int(input(f"Database size (40/50/60) [{DEFAULT_CONFIG['base_donnees']}]: ") or DEFAULT_CONFIG['base_donnees'])
+        args.base = int(input(
+            "Database size (40=small/50=medium/60=large) [40]: "
+        ) or DEFAULT_CONFIG['base_donnees'])
 
-    # Training epochs
+    # Training epochs with recommendation
     if args.epochs is None:
-        args.epochs = int(input(f"Training epochs [{DEFAULT_CONFIG['nb_epoches']}]: ") or DEFAULT_CONFIG['nb_epoches'])
+        args.epochs = int(input(
+            "Max training epochs (recommended: 100-200) [100]: "
+        ) or DEFAULT_CONFIG['nb_epoches'])
 
-    # Adaptive learning rate
+    # Adaptive learning with explanation
     if not args.adaptive:
-        args.adaptive = input("Use adaptive learning rate? (y/n) [n]: ").lower() == 'y'
+        args.adaptive = input(
+            "Use adaptive learning? (y/n) [n]: "
+        ).lower() in ['y', 'yes']
 
-    # Gaussian noise
+    # Input noise with guidance
     if args.noise is None:
-        args.noise = float(input("Add Gaussian noise (sigma, 0 for none) [0]: ") or 0)
+        args.noise = float(input(
+            "Input noise sigma (0.0 to 0.5, 0=disable) [0]: "
+        ) or 0)
 
     return args
 

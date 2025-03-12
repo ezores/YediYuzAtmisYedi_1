@@ -6,6 +6,7 @@ def sigmoid(z, derive=False):
     s = 1 / (1 + np.exp(-z))
     return s * (1 - s) if derive else s
 
+
 def relu(z, derive=False):
     return np.where(z > 0, 1, 0) if derive else np.maximum(0, z)
 
@@ -18,12 +19,21 @@ def tanh(z, derive=False):
     t = np.tanh(z)
     return 1 - t**2 if derive else t
 
+# def softmax(z, derive=False):
+#     e_z = np.exp(z - np.max(z))  # Numerical stability
+#     sm = e_z / e_z.sum(axis=0)
+#     if derive:
+#         return sm * (1 - sm)  # Simplified derivative for cross-entropy
+#     return sm
 def softmax(z, derive=False):
-    e_z = np.exp(z - np.max(z))  # Numerical stability
-    sm = e_z / e_z.sum(axis=0)
-    if derive:
-        return sm * (1 - sm)  # Simplified derivative for cross-entropy
-    return sm
+    e_z = np.exp(z - np.max(z, axis=0, keepdims=True))
+    sm = e_z / np.sum(e_z, axis=0, keepdims=True)
+    return sm * (1 - sm) if derive else sm  # Dérivée corrigée
+
+def cross_entropy_loss(Y_pred, Y_true, epsilon=1e-12):
+    Y_pred = np.clip(Y_pred, epsilon, 1. - epsilon)
+    m = Y_true.shape[1]
+    return -np.sum(Y_true * np.log(Y_pred)) / m
 
 activation_functions = {
     'sigmoid': (sigmoid, sigmoid),
