@@ -61,7 +61,7 @@ python main.py --train --eta 0.001 --neurons 128 64 --activations relu --base 60
 | Argument | Description |
 |----------|------------|
 | `--eta` | Taux d’apprentissage |
-| `--neurons` | Nombre de neurones par couche cachée | Exemple: pour 1 couche de 10 neurones et une 2e couche de 5 neurones, ont met (--neurons 10 5) |
+| `--neurons` | Nombre de neurones par couche cachée.Exemple: pour 1 couche de 10 neurones et une 2e couche de 5 neurones, ont met (--neurons 10 5) |
 | `--activations` | Fonction d'activation (`relu`, `sigmoide`, `tanh`, etc.) |
 | `--base` | Base de données utilisée (40, 50 ou 60) |
 | `--epochs` | Nombre d'époques |
