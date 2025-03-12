@@ -24,7 +24,7 @@ Ce projet implémente un réseau de neurones à rétropropagation du gradient d�
 1️⃣ Prérequis
 - Python 3.8+
 - pip installé
-```
+``` ```
 2️⃣ Cloner le dépôt
 ```sh
 git clone [https://github.com/utilisateur/Projet_NN.git](https://github.com/ezores/YediYuzAtmisYedi_1.git)
@@ -91,6 +91,4 @@ Les poids et l’architecture du réseau peuvent être visualisés et générés
 Ce projet est sous licence **MIT**.  
 Libre d'utilisation, de modification et de distribution.
 
-
-🚀 Prêt à entraîner un réseau de neurones performant pour la reconnaissance de la parole !  
-```
+🚀 Prêt à entraîner un réseau de neurones performant pour la reconnaissance de la parole !
