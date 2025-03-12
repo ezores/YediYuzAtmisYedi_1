@@ -40,17 +40,17 @@ Pour démarer le programme, écrivez cette commande dans le terminal:
     -python main.py
 
 Suivit de :
-help :pour voir un exemple des possibilitées dans le terminal. LE terminal devrait montrer la ligne suivante:
+help :pour voir un exemple des possibilitées dans le terminal. Le terminal devrait montrer la ligne suivante:
 usage: main.py [-h] (--train | --vc | --test) [--eta ETA] [--neurons NEURONS [NEURONS ...]] [--activations ACTIVATIONS [ACTIVATIONS ...]] [--base {40,50,60}] [--epochs EPOCHS] [--adaptive] [--noise NOISE]
 main.py: error: one of the arguments --train --vc --test is required
 
 le premier choix est obligatoire et doit être uniquement l'un des trois choix entre:
 --train: pour faire l'entraînement du MLP.
---vc:    pour faire la valiudation croisé du MLP.
+--vc:    pour faire la validation croisée du MLP.
 --test:  pour tester le MLP.
 
-Si aucun autre paramètre n'est entrée, des paramètres seront demandé à l'utilisateur pour chacune des possibilitées. Pour chaque paramètre deamndé, il est possible d'entrer une valeur désirée
-ou de ne rien entrer pour garder la valeur proposé par le terminal.
+Si aucun autre paramètre n'est entré, des paramètres seront demandés à l'utilisateur pour chacune des possibilitées. Pour chaque paramètre demandé, il est possible d'entrer une valeur désirée
+ou de ne rien entrer pour garder la valeur proposée par le terminal.
 
 Entraîner un modèle
 L'entraînement d'un modèle peut être lancé avec différents hyperparamètres :
@@ -61,7 +61,7 @@ python main.py --train --eta 0.001 --neurons 128 64 --activations relu --base 60
 | Argument | Description |
 |----------|------------|
 | `--eta` | Taux d’apprentissage |
-| `--neurons` | Nombre de neurones par couche cachée.Exemple: pour 1 couche de 10 neurones et une 2e couche de 5 neurones, ont met (--neurons 10 5) |
+| `--neurons` | Nombre de neurones par couche cachée. Exemple: pour 1 couche de 10 neurones et une 2e couche de 5 neurones, ont met (--neurons 10 5) |
 | `--activations` | Fonction d'activation (`relu`, `sigmoide`, `tanh`, etc.) |
 | `--base` | Base de données utilisée (40, 50 ou 60) |
 | `--epochs` | Nombre d'époques |
