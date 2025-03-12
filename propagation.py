@@ -37,8 +37,6 @@ def backward_propagation(x,y, activations_cache, z_cache, weights, activations, 
         print(der_sig)
         delta_L = hadamard_product(delta_L, der_sig)
         deltas[L] = delta_L
-        print("delta_L")
-        print(delta_L)
 
         for l in range(L - 1, -1, -1):
             temp = weights[l + 1].T @ deltas[l + 1]
