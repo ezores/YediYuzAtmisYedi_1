@@ -40,7 +40,8 @@ def train_model(
     velocities = [np.zeros_like(w) for w in weights]
 
     # Formatage des données
-    X_train, Y_train = X_train.T, Y_train.T
+    # X_train, Y_train = X_train.T, Y_train.T
+    X_train, Y_train = X_train, Y_train  # No transpose
     X_val = X_val.T if X_val.size > 0 else X_val
 
     for epoch in range(max_epochs):
@@ -59,7 +60,14 @@ def train_model(
 
         # Backward propagation
         grads = backward_propagation(
-            Y_train, a_cache, z_cache, weights, activations, current_lr
+            # Y_train, a_cache, z_cache, weights, activations, current_lr
+            X_noisy,  # Add X input (was missing)
+            Y_train,
+            a_cache,
+            z_cache,
+            weights,
+            activations,
+            current_lr  # This is the eta parameter
         )
 
         # Mise à jour des poids avec gradient clipping

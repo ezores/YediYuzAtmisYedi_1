@@ -12,9 +12,9 @@ def forward_propagation(X, weights, biases, activations, training=True):
         a = activation_functions[activations[i]][0](z)
         activations_cache.append(a)
 
-    return activations_cache, z_cache
+    return activations_cache, z_cache, []
 
-def backward_propagation(x,y, activations_cache, z_cache, weights, activations, eta):
+def backward_propagation(x, y, activations_cache, z_cache, weights, activations, eta):
     deltas = [None] * len(weights)
     gradients = [None] * len(weights)
     L = len(weights)-1
@@ -44,12 +44,12 @@ def backward_propagation(x,y, activations_cache, z_cache, weights, activations, 
     
 
   
-    gradients[0]= eta*x*deltas[0].T
-  
-
-    for l in range(1,len(weights)):
-        gradients[l] = eta*activations_cache[l]*deltas[l].T
-    
+    # gradients[0]= eta*x*deltas[0].T
+    # for l in range(1,len(weights)):
+    #     gradients[l] = eta*activations_cache[l]*deltas[l].T
+    gradients[0] = eta * np.dot(deltas[0], x.T)  # Shape: (hidden_size, input_size)
+    for l in range(1, len(weights)):
+        gradients[l] = eta * np.dot(deltas[l], activations_cache[l].T)  # Shape: (current_layer_size, prev_layer_size)
 
     return gradients
 
@@ -83,6 +83,6 @@ def update_weights(weights, gradients, momentum=0.9, velocity=None, clip_value=1
     new_weights = [w + v for w, v in zip(weights, velocity)]
     
     # **Transposer chaque poids avant de retourner**
-    transposed_weights = [w.T for w in new_weights]
-
-    return transposed_weights, velocity  # Retourne les poids transposés
+    # transposed_weights = [w.T for w in new_weights]
+    # return transposed_weights, velocity  # Retourne les poids transposés
+    return new_weights, velocity  # Remove transposition
