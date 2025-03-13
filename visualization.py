@@ -22,6 +22,9 @@ def generate_network_visualization(mlp, output_file="Visualization_MLP.html", ma
             Nom du fichier HTML de sortie contenant la visualisation. Par défaut "Visualization_MLP.html".
         max_neurons : int
             Limite du nombre de neurones à afficher par couche (par défaut 20).
+
+    Returns:
+        None
     """
     
     # Création du réseau interactif avec PyVis
