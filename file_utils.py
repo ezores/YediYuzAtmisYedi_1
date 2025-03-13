@@ -6,6 +6,20 @@ DEFAULT_OUTPUT_ENCODING = {str(i): [1 if j == i else 0 for j in range(10)] for i
 
 
 def process_file(input_file, output_file, elements_per_segment=26, selected_elements=12, total_segments=40):
+    """
+    Process raw data file into formatted output file with selected elements
+    This function is used to preprocess the raw data file into a format that can be used for training
+
+    Args:
+        input_file: Path to raw input data
+        output_file: Path to save processed output
+        elements_per_segment: Number of elements per segment
+        selected_elements: Number of selected elements per segment
+        total_segments: Total number of segments
+
+    Returns:
+        None
+    """
     all_values = []
     VALID_IDS = set(DEFAULT_OUTPUT_ENCODING.keys())
 
@@ -62,9 +76,17 @@ def process_file(input_file, output_file, elements_per_segment=26, selected_elem
 
 def getES(filename, output_encoding):
     """
+    Load and return input samples and labels from processed file
     Enhanced data loading with:
     - Additional sanity checks
     - Automatic value casting
+
+    Args:
+        filename: Path to processed input file
+        output_encoding: Dictionary mapping identifiers to labels
+
+    Returns:
+        Tuple of (samples, labels)
     """
     samples = []
     labels = []
@@ -129,6 +151,9 @@ def debug_data_processing(input_file: str, output_file: str):
     Args:
         input_file: Path to raw input data
         output_file: Path to save processed output
+
+    Returns:
+        None
     """
     print("\n=== Data Processing Debug ===")
     
@@ -205,7 +230,16 @@ def auto_detect_parameters(input_file: str) -> Tuple[int, int, int]:
 
 def save_hidden_units(hidden_activations: List[np.ndarray], 
                      filename: str = "hidden_units.txt") -> None:
-    """Saves hidden layer activations with formatting"""
+    """
+    Saves hidden layer activations with formatting
+
+    Args:
+        hidden_activations: List of hidden layer activations
+        filename: Output filename for saved activations
+
+    Returns:
+        None
+    """
     try:
         with open(filename, 'w') as f:
             for layer_idx, activations in enumerate(hidden_activations, 1):

@@ -24,6 +24,13 @@ DEFAULT_CONFIG = {
 def parse_arguments():
     """
     Parse command-line arguments for the MLP speech recognition system
+
+    Args:
+        None
+
+    Returns:
+        argparse.Namespace: Parsed arguments
+
     """
     parser = argparse.ArgumentParser(description="MLP Speech Recognition System")
     mode_group = parser.add_mutually_exclusive_group(required=True)
@@ -44,6 +51,12 @@ def parse_arguments():
 def interactive_config(args):
     """
     Interactive configuration for the MLP speech recognition system
+
+    Args:
+        args (argparse.Namespace): Parsed arguments
+
+    Returns:
+        argparse.Namespace: Updated arguments
     """
     print("\n=== Network Configuration ===")
     activations_list = list(activation_functions.keys())
@@ -74,6 +87,12 @@ def interactive_config(args):
 def load_or_create_config(args):
     """'
     Load or create configuration file for the MLP speech recognition system
+
+    Args:
+        args (argparse.Namespace): Parsed arguments
+
+    Returns:
+        configparser.ConfigParser: Loaded or created configuration
     """
     config = configparser.ConfigParser()
     if os.path.exists('config.ini'):
@@ -98,6 +117,14 @@ def prepare_datasets(base_size: int, input_dir: str = "InputFiles", output_dir: 
     """
     Process the training data file for the MLP speech recognition system
     This function will process the input file and generate a new file with the selected elements
+    
+    Args:
+        base_size (int): Number of segments in the database
+        input_dir (str): Input directory for data files
+        output_dir (str): Output directory for processed files
+    
+    Returns:
+        str: Path to the processed data file
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
@@ -116,6 +143,12 @@ def prepare_datasets(base_size: int, input_dir: str = "InputFiles", output_dir: 
 def main():
     """
     Main function for the MLP speech recognition system
+
+    Args:
+        None
+
+    Returns:
+        None
     """
     args = parse_arguments()
     args = interactive_config(args)

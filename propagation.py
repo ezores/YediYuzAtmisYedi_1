@@ -2,6 +2,20 @@ import numpy as np
 from mlp_math import activation_functions,hadamard_product
 
 def forward_propagation(X, weights, biases, activations, training=True):
+    """
+    Propagation avant du réseau de neurones
+
+    Args:
+        X (np.ndarray): Entrée du réseau
+        weights (List[np.ndarray]): Poids du réseau
+        biases (List[np.ndarray]): Biais du réseau
+        activations (List[str]): Fonctions d'activation pour chaque couche
+        training (bool): Mode d'entraînement ou d'évaluation
+
+    Returns:
+        Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
+            Activations, z et dropout_masks pour chaque couche
+    """
     activations_cache = [X]
     z_cache = []
 
@@ -15,6 +29,21 @@ def forward_propagation(X, weights, biases, activations, training=True):
     return activations_cache, z_cache, []
 
 def backward_propagation(x, y, activations_cache, z_cache, weights, activations, eta):
+    """
+    Propagation arrière du réseau de neurones
+
+    Args:
+        x (np.ndarray): Entrée du réseau
+        y (np.ndarray): Sortie attendue
+        activations_cache (List[np.ndarray]): Cache des activations
+        z_cache (List[np.ndarray]): Cache des z
+        weights (List[np.ndarray]): Poids du réseau
+        activations (List[str]): Fonctions d'activation pour chaque couche
+        eta (float): Taux d'apprentissage
+
+    Returns:
+        List[np.ndarray]: Gradients pour chaque couche
+    """
     deltas = [None] * len(weights)
     gradients = [None] * len(weights)
     L = len(weights)-1
@@ -43,10 +72,6 @@ def backward_propagation(x, y, activations_cache, z_cache, weights, activations,
             deltas[l] = hadamard_product(temp, deriv)
     
 
-  
-    # gradients[0]= eta*x*deltas[0].T
-    # for l in range(1,len(weights)):
-    #     gradients[l] = eta*activations_cache[l]*deltas[l].T
     gradients[0] = eta * np.dot(deltas[0], x.T)  # Shape: (hidden_size, input_size)
     for l in range(1, len(weights)):
         gradients[l] = eta * np.dot(deltas[l], activations_cache[l].T)  # Shape: (current_layer_size, prev_layer_size)
@@ -56,8 +81,19 @@ def backward_propagation(x, y, activations_cache, z_cache, weights, activations,
 
 
 def update_weights(weights, gradients, momentum=0.9, velocity=None, clip_value=1.0):
-    import numpy as np  # Ensure NumPy is imported
+    """
+    Met à jour les poids du réseau avec descente de gradient et momentum
 
+    Args:
+        weights (List[np.ndarray]): Poids du réseau
+        gradients (List[np.ndarray]): Gradients calculés
+        momentum (float): Facteur de momentum
+        velocity (List[np.ndarray]): Vitesse précédente
+        clip_value (float): Valeur de clipping pour les gradients
+
+    Returns:
+        List[np.ndarray]: Nouveaux poids
+    """
     # Étape 1: Clip les gradients pour éviter les explosions
     gradients = [np.clip(g, -clip_value, clip_value) for g in gradients]
     
@@ -83,6 +119,4 @@ def update_weights(weights, gradients, momentum=0.9, velocity=None, clip_value=1
     new_weights = [w + v for w, v in zip(weights, velocity)]
     
     # **Transposer chaque poids avant de retourner**
-    # transposed_weights = [w.T for w in new_weights]
-    # return transposed_weights, velocity  # Retourne les poids transposés
     return new_weights, velocity  # Remove transposition

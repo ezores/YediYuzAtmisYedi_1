@@ -11,17 +11,20 @@ class MLP:
         """
         Multilayer Perceptron with enhanced training capabilities
         
-        Parameters:
-        input_size (int): Number of input features
-        hidden_sizes (list): List of integers specifying hidden layer sizes
-        output_size (int): Number of output neurons
-        activation (str): Activation function for hidden layers
-        learning_rate (float): Initial learning rate
-        max_epochs (int): Maximum number of training epochs
-        patience (int): Early stopping patience
-        adaptive_eta (bool): Enable adaptive learning rate
-        noise_sigma (float): Standard deviation for input noise
-        momentum (float): Momentum factor (0-1)
+        Args:
+            input_size (int): Number of input features
+            hidden_sizes (list): List of integers specifying hidden layer sizes
+            output_size (int): Number of output neurons
+            activation (str): Activation function for hidden layers
+            learning_rate (float): Initial learning rate
+            max_epochs (int): Maximum number of training epochs
+            patience (int): Early stopping patience
+            adaptive_eta (bool): Enable adaptive learning rate
+            noise_sigma (float): Standard deviation for input noise
+            momentum (float): Momentum factor (0-1)
+
+        Returns:
+            None
         """
         self.input_size = input_size
         self.hidden_sizes = hidden_sizes
@@ -41,24 +44,16 @@ class MLP:
         self.best_biases = None
         self.training_history = None
 
-    # def _initialize_parameters(self):
-    #     """Initialize weights with He initialization and biases to zero"""
-    #     layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
-    #     weights = []
-    #     biases = []
-    #
-    #     for i in range(len(layer_sizes)-1):
-    #         # He initialization for ReLU variants, sqrt(2/n) for others
-    #         if self.activation in ['relu', 'leakyrelu']:
-    #             std = np.sqrt(2.0 / layer_sizes[i])
-    #         else:
-    #             std = np.sqrt(1.0 / layer_sizes[i])
-    #
-    #         weights.append(np.random.randn(layer_sizes[i+1], layer_sizes[i]) * std)
-    #         biases.append(np.zeros((layer_sizes[i+1], 1)))
-    #
-    #     return weights, biases
     def _initialize_parameters(self):
+        """
+        Initialize network weights and biases
+
+        Args:
+            None
+
+        Returns:
+            Tuple[List[np.ndarray], List[np.ndarray]]: Initial weights and biases
+        """
         layer_sizes = [self.input_size] + self.hidden_sizes + [self.output_size]
         weights = []
         biases = []
@@ -76,10 +71,15 @@ class MLP:
     def train(self, X_train, Y_train, X_val=None, Y_val=None):
         """
         Train the network with optional validation set
-        X_train: Training samples (n_samples, n_features)
-        Y_train: Training labels (n_samples, n_outputs)
-        X_val: Validation samples (optional)
-        Y_val: Validation labels (optional)
+
+        Args:
+            X_train (np.ndarray): Training features
+            Y_train (np.ndarray): Training labels
+            X_val (np.ndarray): Validation features
+            Y_val (np.ndarray): Validation labels
+
+        Returns:
+            dict: Training history
         """
         # Convert to numpy arrays
         X_train = np.array(X_train)
@@ -114,13 +114,16 @@ class MLP:
         
         return history
 
-    # def predict(self, X):
-    #     """Make predictions for input samples"""
-    #     X = np.array(X).T  # Convert to column vectors
-    #     activations, _ = forward_propagation(X, self.weights, self.biases,
-    #                                        [self.activation]*len(self.hidden_sizes) + ['sigmoid'])
-    #     return activations[-1].T  # Return as row vectors
     def predict(self, X):
+        """
+        Generate predictions for given samples
+
+        Args:
+            X (np.ndarray): Input samples
+
+        Returns:
+            np.ndarray: Predicted labels
+        """
         X = np.array(X).T  # Convert to column vectors
         activations, _, _ = forward_propagation(  # Add third unpacking
             X,
@@ -131,29 +134,31 @@ class MLP:
         return activations[-1].T
 
     def evaluate(self, X, Y):
-        """Calculate accuracy for given samples and labels"""
+        """
+        Calculate accuracy for given samples and labels
+
+        Args:
+            X (np.ndarray): Input samples
+            Y (np.ndarray): True labels
+
+        Returns:
+            float: Accuracy
+        """
         predictions = self.predict(X)
         y_true = np.argmax(Y, axis=1)
         y_pred = np.argmax(predictions, axis=1)
         return np.mean(y_pred == y_true)
 
-    # def save_hidden_units(self, X):
-    #     """Save activations of all hidden layers for given input"""
-    #     X = np.array(X).T  # Convert to column vectors
-    #     activations, _ = forward_propagation(X, self.weights, self.biases,
-    #                                        [self.activation]*len(self.hidden_sizes) + ['sigmoid'])
-    #
-    #     # Extract hidden layer activations (exclude input and output)
-    #     hidden_activations = activations[1:-1]
-    #
-    #     # Format and save activations
-    #     formatted_activations = []
-    #     for layer_idx, layer_acts in enumerate(hidden_activations):
-    #         # Transpose to get samples as rows, neurons as columns
-    #         formatted_activations.append(layer_acts.T)
-    #
-    #     save_hidden_units(formatted_activations)
     def save_hidden_units(self, X):
+        """
+        Save hidden unit activations for given samples
+
+        Args:
+            X (np.ndarray): Input samples
+
+        Returns:
+            None
+        """
         X = np.array(X).T
         activations, _, _ = forward_propagation(  # Add third unpacking
             X,
@@ -168,7 +173,15 @@ class MLP:
         save_hidden_units(formatted_activations)
         
     def get_architecture(self):
-        """Return network architecture description"""
+        """
+        Return network architecture description
+
+        Args:
+            None
+
+        Returns:
+            dict: Network architecture parameters
+        """
         return {
             'input_size': self.input_size,
             'hidden_layers': self.hidden_sizes,
@@ -181,6 +194,14 @@ class MLP:
         }
 
     def reset_parameters(self):
-        """Re-initialize network parameters"""
+        """
+        Re-initialize network parameters
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         self.weights, self.biases = self._initialize_parameters()
         self.training_history = None
