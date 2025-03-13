@@ -22,6 +22,9 @@ DEFAULT_CONFIG = {
 
 
 def parse_arguments():
+    """
+    Parse command-line arguments for the MLP speech recognition system
+    """
     parser = argparse.ArgumentParser(description="MLP Speech Recognition System")
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument('--train', action='store_true', help='Train the model')
@@ -39,6 +42,9 @@ def parse_arguments():
 
 
 def interactive_config(args):
+    """
+    Interactive configuration for the MLP speech recognition system
+    """
     print("\n=== Network Configuration ===")
     activations_list = list(activation_functions.keys())
     if args.eta is None:
@@ -66,6 +72,9 @@ def interactive_config(args):
 
 
 def load_or_create_config(args):
+    """'
+    Load or create configuration file for the MLP speech recognition system
+    """
     config = configparser.ConfigParser()
     if os.path.exists('config.ini'):
         config.read('config.ini')
@@ -86,6 +95,10 @@ def load_or_create_config(args):
 def prepare_datasets(base_size: int, input_dir: str = "InputFiles", output_dir: str = "OutputFiles") -> str:
     input_path = os.path.join(input_dir, "data_train.txt")
     output_path = os.path.join(output_dir, f"data_train_{base_size}_ligne.txt")
+    """
+    Process the training data file for the MLP speech recognition system
+    This function will process the input file and generate a new file with the selected elements
+    """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
     if not os.path.exists(output_path):
@@ -101,6 +114,9 @@ def prepare_datasets(base_size: int, input_dir: str = "InputFiles", output_dir: 
 
 
 def main():
+    """
+    Main function for the MLP speech recognition system
+    """
     args = parse_arguments()
     args = interactive_config(args)
     config = load_or_create_config(args)
